@@ -24,10 +24,12 @@ python-generators-0x00/
 ├── seed.py              # Main seeding script
 ├── 0-stream_users.py    # Database streaming generator
 ├── 1-batch_processing.py # Batch processing with filtering
+├── 2-lazy_paginate.py   # Lazy pagination implementation
 ├── user_data.csv        # Sample data file (1000 rows)
 ├── 0-main.py            # Seeding test script
 ├── 1-main.py            # Streaming test script
 ├── 2-main.py            # Batch processing test script
+├── 3-main.py            # Lazy pagination test script
 └── README.md
 ```
 
@@ -182,6 +184,43 @@ for batch in stream_users_batch(100):
     print(f"Processing batch of {len(batch)} users")
 ```
 
+### Lazy Pagination
+
+#### Command Line Usage
+
+```bash
+# Run the lazy pagination test script
+python3 3-main.py
+```
+
+#### Programmatic Usage
+
+```python
+from 2-lazy_paginate import lazy_pagination, LazyPaginator
+
+# Stream users in paginated chunks
+for page in lazy_pagination(100):
+    print(f"Processing page with {len(page)} users")
+    for user in page:
+        print(f"User: {user['name']} - {user['email']}")
+
+# Using context manager for pagination
+with LazyPaginator(50) as paginator:
+    for page in paginator.paginate():
+        print(f"Page contains {len(page)} users")
+        # Process each page as needed
+```
+
+#### Advanced Usage
+
+```python
+# Process only first few pages
+for i, page in enumerate(lazy_pagination(100)):
+    if i >= 3:  # Process only first 3 pages
+        break
+    print(f"Page {i + 1}: {len(page)} users")
+```
+
 ### Batch Processing
 
 #### Command Line Usage
@@ -224,6 +263,63 @@ with BatchProcessor(batch_size=50) as processor:
 ```
 
 ## API Reference
+
+### Lazy Pagination Functions
+
+#### `lazy_pagination(page_size: int) -> Generator[List[Dict[str, Any]], None, None]`
+
+Generator function that lazily loads paginated user data from the database.
+
+**Parameters:**
+
+- `page_size`: Number of users to fetch per page
+
+**Yields:**
+
+- `List[Dict[str, Any]]`: List of user dictionaries containing:
+  - `user_id`: str (UUID)
+  - `name`: str
+  - `email`: str
+  - `age`: Decimal
+  - `created_at`: datetime
+  - `updated_at`: datetime
+
+**Raises:**
+
+- `PaginationError`: If database operation fails
+- `ValueError`: If page_size is not a positive integer
+
+#### `paginate_users(page_size: int, offset: int) -> List[Dict[str, Any]]`
+
+Fetch a page of users from the database with the given page size and offset.
+
+**Parameters:**
+
+- `page_size`: Number of users to fetch per page
+- `offset`: Number of records to skip (starting point)
+
+**Returns:**
+
+- `List[Dict[str, Any]]`: List of user dictionaries
+
+**Raises:**
+
+- `PaginationError`: If database operation fails
+- `ValueError`: If page_size is not a positive integer
+
+#### `LazyPaginator(page_size: int)`
+
+Context manager for lazy pagination operations.
+
+**Parameters:**
+
+- `page_size`: Number of users to fetch per page
+
+**Methods:**
+
+- `__enter__()`: Enter the context manager
+- `__exit__(exc_type, exc_val, exc_tb)`: Exit and cleanup resources
+- `paginate()`: Generate pages of user data
 
 ### Database Seeding Functions
 
@@ -473,6 +569,28 @@ Expected output:
 {'user_id': '01e0e55f-a835-4155-b9da-0fcb401a7666', 'name': 'Patti Barton', 'email': 'santiago_friesen72@yahoo.com', 'age': Decimal('41')}
 ```
 
+### Lazy Pagination Test
+
+Run the lazy pagination test script:
+
+```bash
+python 3-main.py | head -n 7
+```
+
+Expected output:
+
+```bash
+2025-07-06 19:09:19,298 - 2-lazy_paginate - INFO - Starting lazy pagination with page_size=100
+2025-07-06 19:09:19,460 - seed - INFO - Successfully connected to ALX_prodev database
+{'user_id': '004eba9f-acba-4efa-9312-71384c0e0815', 'name': 'Cora Zieme-Schinner', 'email': 'clifford66@hotmail.com', 'age': Decimal('82'), 'created_at': datetime.datetime(2025, 7, 6, 17, 47, 18), 'updated_at': datetime.datetime(2025, 7, 6, 17, 47, 18)}
+{'user_id': '00620d85-a23e-4320-907f-25353684b5ac', 'name': 'Mr. Carlos Hyatt', 'email': 'james90@yahoo.com', 'age': Decimal('120'), 'created_at': datetime.datetime(2025, 7, 6, 17, 47, 18), 'updated_at': datetime.datetime(2025, 7, 6, 17, 47, 18)}
+{'user_id': '007f0589-280e-4836-80cb-0255fdb5cc4d', 'name': 'Heidi Zulauf', 'email': 'brett1@hotmail.com', 'age': Decimal('49'), 'created_at': datetime.datetime(2025, 7, 6, 17, 47, 18), 'updated_at': datetime.datetime(2025, 7, 6, 17, 47, 18)}        
+{'user_id': '00e501ff-d7d2-4689-abe3-07a1f61b6b27', 'name': 'Toby VonRueden-Dicki', 'email': 'thomas1@gmail.com', 'age': Decimal('91'), 'created_at': datetime.datetime(2025, 7, 6, 17, 47, 18), 'updated_at': datetime.datetime(2025, 7, 6, 17, 47, 18)} 
+{'user_id': '01e0e55f-a835-4155-b9da-0fcb401a7666', 'name': 'Patti Barton', 'email': 'santiago_friesen72@yahoo.com', 'age': Decimal('41'), 'created_at': datetime.datetime(2025, 7, 6, 17, 47, 18), 'updated_at': datetime.datetime(2025, 7, 6, 17, 47, 18)}
+{'user_id': '023c9d12-d02d-4183-b07c-46695fdab628', 'name': 'Aaron Will', 'email': 'zachary_harris51@hotmail.com', 'age': Decimal('85'), 'created_at': datetime.datetime(2025, 7, 6, 17, 47, 18), 'updated_at': datetime.datetime(2025, 7, 6, 17, 47, 18)}
+{'user_id': '02575567-9a16-4d25-9671-7b48442c70c9', 'name': 'Kathleen Prosacco', 'email': 'ervin.nitzsche16@hotmail.com', 'age': Decimal('5'), 'created_at': datetime.datetime(2025, 7, 6, 17, 47, 18), 'updated_at': datetime.datetime(2025, 7, 6, 17, 472025-07-06 19:09:19,473 - seed - INFO - Successfully connected to ALX_prodev database
+```
+
 ## Troubleshooting
 
 ### Common Issues
@@ -597,7 +715,9 @@ This project is part of the ALX ProDEV curriculum.
   - `seed.py` - Database seeding functionality
   - `0-stream_users.py` - Database streaming generator
   - `1-batch_processing.py` - Batch processing with filtering
+  - `2-lazy_paginate.py` - Lazy pagination with batch processing
   - `user_data.csv` - Sample data file
   - `0-main.py` - Seeding test script
   - `1-main.py` - Streaming test script
   - `2-main.py` - Batch processing test script
+  - `3-main.py` - Lazy pagination test script
