@@ -149,62 +149,6 @@ users = fetch_all_users(query="SELECT * FROM users")
 Executing SQL Query: SELECT * FROM users
 ```
 
-## Best Practices
-
-### Django Integration
-
-For Django applications, consider using Django's logging system instead of `print()`:
-
-```python
-import logging
-
-logger = logging.getLogger(__name__)
-
-def log_queries(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        query = args[0] if args else kwargs.get('query', 'No query provided')
-        logger.info(f"Executing SQL Query: {query}")
-        return func(*args, **kwargs)
-    return wrapper
-```
-
-### Production Considerations
-
-* Replace `print()` with proper logging
-* Add query sanitization for sensitive data
-* Consider performance impact of logging
-* Implement log rotation for large applications
-
-## Limitations
-
-* **Query Parameter Assumption** : Assumes the first parameter is always the SQL query
-* **Basic Logging** : Uses simple `print()` statements
-* **No Query Validation** : Doesn't validate SQL syntax
-* **Single Query Support** : Designed for functions with one query parameter
-
-## Contributing
-
-This decorator is part of the ALX Backend Python curriculum. To contribute:
-
-1. Fork the repository
-2. Create a feature branch
-3. Follow PEP 8 style guidelines
-4. Add tests for new functionality
-5. Submit a pull request
-
-## Repository Information
-
-* **GitHub repository** : `alx-backend-python`
-* **Directory** : `python-decorators-0x01`
-* **File** : `0-log_queries.py`
-
 ## License
 
 This project is part of the ALX Backend ProDEV Software Engineering curriculum.
-
-## Related Resources
-
-* [Python Decorators Documentation](https://docs.python.org/3/glossary.html#term-decorator)
-* [functools.wraps Documentation](https://docs.python.org/3/library/functools.html#functools.wraps)
-* [SQLite3 Python Documentation](https://docs.python.org/3/library/sqlite3.html)

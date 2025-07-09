@@ -1,6 +1,6 @@
 import functools
 import sqlite3
-import datetime from datetime
+from datetime import datetime
 
 
 def log_queries(func):
