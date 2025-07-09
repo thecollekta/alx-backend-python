@@ -8,6 +8,7 @@ A collection of Python decorators for database operations, including query loggi
 
 * **Automatic Query Logging**: Monitor and debug SQL queries before execution
 * **Database Connection Management**: Automatic connection lifecycle handling
+* **Transaction Management**: Automatic commit/rollback handling for database operations
 * **Flexible Argument Handling**: Supports both positional and keyword arguments
 * **Function Metadata Preservation**: Uses `functools.wraps` to maintain original function properties
 * **Non-intrusive**: No modification required to existing database functions
@@ -83,7 +84,7 @@ users = fetch_all_users(query="SELECT * FROM users WHERE active = 1")
 
 A decorator that automatically handles database connection lifecycle - opening, passing to function, and closing connections.
 
-#### Implementation
+Implementation:
 
 ```python
 import sqlite3
@@ -124,7 +125,7 @@ def get_user_by_id(conn, user_id):
     return cursor.fetchone()
 ```
 
-#### Usage Example
+Usage Example:
 
 ```python
 # Database setup (run once)
@@ -150,6 +151,57 @@ user = get_user_by_id(user_id=1)
 print(user)  # Output: (1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')
 ```
 
+### 3. Transaction Management Decorator
+
+A decorator that manages database transactions by automatically committing successful operations or rolling back on errors.
+
+Implementation:
+
+```python
+def transactional(func):
+    """
+    Decorator to manage database transactions.
+
+    Args:
+        func: The function to be decorated (must accept conn as first parameter)
+        
+    Returns:
+        wrapper: The decorated function with automatic transaction management
+    """
+    @functools.wraps(func)
+    def wrapper(conn, *args, **kwargs):
+        try:
+            result = func(conn, *args, **kwargs)
+        except Exception as e:
+            conn.rollback()
+            print("Transaction rolled back due to an error.")
+            raise e
+        else:
+            conn.commit()
+            print("Transaction committed successfully.")
+        return result
+    return wrapper
+
+@with_db_connection
+@transactional
+def update_user_email(conn, user_id, new_email):
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET email = ? WHERE id = ?", (new_email, user_id))
+```
+
+Usage Example:
+
+```python
+# Update user email with automatic transaction handling
+update_user_email(user_id=1, new_email="<kwame.nkrumah@gmail.com>")
+
+# Output on success
+# Transaction committed successfully
+
+# Output on error
+# Transaction rolled back due to an error
+```
+
 ## Combined Usage
 
 You can combine both decorators for comprehensive database function enhancement:
@@ -167,9 +219,27 @@ def get_user_with_logging(conn, query, user_id):
 user = get_user_with_logging("SELECT * FROM users WHERE id = ?", user_id=1)
 ```
 
+```python
+@log_queries
+@with_db_connection
+@transactional
+def complex_database_operation(conn, query, user_id, new_data):
+    """Complex operation with logging, connection management, and transactions."""
+    cursor = conn.cursor()
+    cursor.execute(query, (new_data, user_id))
+    return cursor.rowcount
+
+# Usage
+rows_affected = complex_database_operation(
+    "UPDATE users SET name = ? WHERE id = ?", 
+    user_id=1, 
+    new_data="Updated Name"
+)
+```
+
 ## How They Work
 
-### Log Queries Decorator
+### Log Queries Decorator (How It Works)
 
 1. **Decoration**: Wraps the target function
 2. **Argument Extraction**: Extracts the SQL query from function arguments
@@ -177,7 +247,7 @@ user = get_user_with_logging("SELECT * FROM users WHERE id = ?", user_id=1)
 4. **Execution**: Calls the original function with all original arguments
 5. **Return**: Returns the result from the original function
 
-### Database Connection Decorator
+### Database Connection Decorator (How It Works)
 
 1. **Setup**: Creates database connection
 2. **Injection**: Passes connection as first argument to the decorated function
@@ -185,29 +255,61 @@ user = get_user_with_logging("SELECT * FROM users WHERE id = ?", user_id=1)
 4. **Cleanup**: Ensures connection is closed in finally block (even on errors)
 5. **Return**: Returns the result from the original function
 
+### Transaction Management Decorator (How It Works)
+
+1. **Execution**: Calls the original function within a try-except block
+2. **Success Path**: Commits the transaction if no exceptions occur
+3. **Error Path**: Rolls back the transaction if any exception is raised
+4. **Exception Handling**: Re-raises the original exception after rollback
+5. **Return**: Returns the result from the original function
+
+#### Decorator Stacking Order
+
+When using multiple decorators, they are applied bottom-up:
+
+```python
+@with_db_connection
+@transactional
+def update_user_email(conn, user_id, new_email):
+    # Function implementation
+```
+
+**Execution Order**:
+
+1. `transactional` wraps the original function first
+2. `with_db_connectio`n wraps the result of `transactional`
+3. Connection is created → Transaction is managed → Function executes
+
 ## Argument Handling
 
 ### Log Queries Decorator
 
 * **Positional Arguments**: `fetch_all_users("SELECT * FROM users")`
-
 * **Keyword Arguments**: `fetch_all_users(query="SELECT * FROM users")`
 * **Fallback**: Logs `"No query provided"` if query not found
 
 ### Database Connection Decorator
 
 * **Connection Injection**: Automatically passes `conn` as first parameter
-
 * **Argument Forwarding**: All other arguments passed through unchanged
 * **Error Safety**: Connection cleanup guaranteed via try/finally
+
+### Transaction Management Decorator
+
+* **Connection Required**: Must be used with `@with_db_connection` or similar
+* **Automatic Commit**: Commits transaction on successful execution
+* **Automatic Rollback**: Rolls back transaction on any exception
+* **Exception Propagation**: Re-raises original exceptions after rollback
 
 ## Best Practices
 
 1. **Connection Management**: Always use the connection decorator for functions that need database access
-2. **Query Logging**: Use query logging decorator during development and debugging
-3. **Error Handling**: Both decorators handle errors gracefully
-4. **Resource Cleanup**: Connections are automatically closed, preventing resource leaks
-5. **Function Signatures**: Decorated functions must accept `conn` as first parameter when using `@with_db_connection`
+2. **Transaction Safety**: Use transaction decorator for operations that modify data
+3. **Query Logging**: Use query logging decorator during development and debugging
+4. **Decorator Order**: Place @with_db_connection before @transactional
+5. **Error Handling**: Both decorators handle errors gracefully
+6. **Resource Cleanup**: Connections are automatically closed, preventing resource leaks
+7. **Function Signatures**: Decorated functions must accept `conn` as first parameter when using `@with_db_connection`
 
 ## File Structure
 
@@ -215,6 +317,7 @@ user = get_user_with_logging("SELECT * FROM users WHERE id = ?", user_id=1)
 python-decorators/
 ├── 0-log_queries.py
 ├── 1-with_db_connection.py
+├── 2-transactional.py
 ├── users.db
 └── README.md
 ```
@@ -229,6 +332,12 @@ from django.db import transaction
 @transaction.atomic
 def get_user_by_id(user_id):
     return User.objects.get(id=user_id)
+
+@transaction.atomic
+def update_user_email(user_id, new_email):
+    user = User.objects.get(id=user_id)
+    user.email = new_email
+    user.save()
 ```
 
 ## Testing
@@ -260,6 +369,13 @@ if __name__ == "__main__":
     # Test query logging
     users = fetch_all_users("SELECT * FROM users")
     print(f"All users: {users}")
+
+    # Test transaction decorator
+    update_user_email(user_id=1, new_email="updated@example.com")
+    
+    # Verify update
+    updated_user = get_user_by_id(user_id=1)
+    print(f"Updated user: {updated_user}")
 ```
 
 ## Expected Output
