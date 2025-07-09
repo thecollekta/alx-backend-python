@@ -1,19 +1,17 @@
-# Python Generators
-
-## Log Queries Decorator
-
-A Python decorator that logs SQL queries before execution, designed for database interaction functions.
+# Python Decorators
 
 ## Overview
 
-The `log_queries` decorator provides a simple way to monitor and debug SQL queries in your Python applications. It intercepts function calls, logs the SQL query being executed, and then proceeds with the original function execution.
+A collection of Python decorators for database operations, including query logging and automatic connection management. These decorators provide clean, reusable patterns for database interaction functions.
 
 ## Features
 
-* **Automatic Query Logging** : Logs SQL queries before execution
-* **Flexible Argument Handling** : Supports both positional and keyword arguments
-* **Function Metadata Preservation** : Uses `functools.wraps` to maintain original function properties
-* **Non-intrusive** : No modification required to existing database functions
+* **Automatic Query Logging**: Monitor and debug SQL queries before execution
+* **Database Connection Management**: Automatic connection lifecycle handling
+* **Flexible Argument Handling**: Supports both positional and keyword arguments
+* **Function Metadata Preservation**: Uses `functools.wraps` to maintain original function properties
+* **Non-intrusive**: No modification required to existing database functions
+* **Resource Safety**: Proper cleanup with try/finally blocks
 
 ## Installation
 
@@ -24,13 +22,18 @@ import sqlite3
 import functools
 ```
 
-## Usage
+## Decorators
 
-### Basic Implementation
+### 1. Log Queries Decorator
+
+A decorator that logs SQL queries before execution, designed for database interaction functions.
+
+#### Implementation
 
 ```python
 import sqlite3
 import functools
+from datetime import datetime
 
 def log_queries(func):
     """
@@ -46,7 +49,8 @@ def log_queries(func):
     def wrapper(*args, **kwargs):
         # Handle both positional and keyword arguments
         query = args[0] if args else kwargs.get('query', 'No query provided')
-        print(f"Executing SQL Query: {query}")
+        current_time = datetime.now()
+        print(f"[{current_time}]Executing SQL Query: {query}")
         return func(*args, **kwargs)
     return wrapper
 
@@ -61,7 +65,7 @@ def fetch_all_users(query):
     return results
 ```
 
-### Example Usage
+#### Usage Example
 
 ```python
 # Using positional argument
@@ -75,78 +79,195 @@ users = fetch_all_users(query="SELECT * FROM users WHERE active = 1")
 # Executing SQL Query: SELECT * FROM users WHERE active = 1
 ```
 
-## How It Works
+### 2. Database Connection Decorator
 
-1. **Decoration** : The `@log_queries` decorator wraps the target function
-2. **Argument Extraction** : Extracts the SQL query from function arguments
-3. **Logging** : Prints the query to stdout before execution
-4. **Execution** : Calls the original function with all original arguments
-5. **Return** : Returns the result from the original function
+A decorator that automatically handles database connection lifecycle - opening, passing to function, and closing connections.
 
-## Argument Handling
-
-The decorator handles multiple argument patterns:
-
-### Positional Arguments
-
-```python
-fetch_all_users("SELECT * FROM users")
-# query extracted from args[0]
-```
-
-### Keyword Arguments
-
-```python
-fetch_all_users(query="SELECT * FROM users")
-# query extracted from kwargs.get('query')
-```
-
-### Fallback Behavior
-
-If no query is found in either position, logs: `"No query provided"`
-
-## File Structure
-
-```text
-python-decorators-0x01/
-├── 0-log_queries.py
-└── README.md
-```
-
-## Code Example
-
-Complete working example:
+#### Implementation
 
 ```python
 import sqlite3
 import functools
 
-def log_queries(func):
+def with_db_connection(func):
+    """
+    Decorator to handle database connection lifecycle.
+    
+    Args:
+        func: The function to be decorated (must accept conn as first parameter)
+        
+    Returns:
+        wrapper: The decorated function with automatic connection management
+    """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        # Handle both positional and keyword arguments
-        query = args[0] if args else kwargs.get('query', 'No query provided')
-        print(f"Executing SQL Query: {query}")
-        return func(*args, **kwargs)
+        conn = None
+        try:
+            # Create database connection
+            conn = sqlite3.connect('users.db')
+            
+            # Call original function with connection as first argument
+            result = func(conn, *args, **kwargs)
+            
+            return result
+        finally:
+            # Ensure connection is closed even if an error occurs
+            if conn:
+                conn.close()
     return wrapper
 
-@log_queries
-def fetch_all_users(query):
+@with_db_connection
+def get_user_by_id(conn, user_id):
+    """Get a user by ID with automatic connection handling."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    return cursor.fetchone()
+```
+
+#### Usage Example
+
+```python
+# Database setup (run once)
+def setup_database():
+    """Create the database and users table for testing"""
     conn = sqlite3.connect('users.db')
     cursor = conn.cursor()
-    cursor.execute(query)
-    results = cursor.fetchall()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT
+        )
+    ''')
+    # Insert data
+    cursor.execute("INSERT OR IGNORE INTO users (id, name, email) VALUES (1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')")
+    conn.commit()
     conn.close()
-    return results
 
 # Usage
-users = fetch_all_users(query="SELECT * FROM users")
+setup_database()
+user = get_user_by_id(user_id=1)
+print(user)  # Output: (1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')
+```
+
+## Combined Usage
+
+You can combine both decorators for comprehensive database function enhancement:
+
+```python
+@log_queries
+@with_db_connection
+def get_user_with_logging(conn, query, user_id):
+    """Get user with both connection management and query logging."""
+    cursor = conn.cursor()
+    cursor.execute(query, (user_id,))
+    return cursor.fetchone()
+
+# Usage
+user = get_user_with_logging("SELECT * FROM users WHERE id = ?", user_id=1)
+```
+
+## How They Work
+
+### Log Queries Decorator
+
+1. **Decoration**: Wraps the target function
+2. **Argument Extraction**: Extracts the SQL query from function arguments
+3. **Logging**: Prints the query to stdout before execution
+4. **Execution**: Calls the original function with all original arguments
+5. **Return**: Returns the result from the original function
+
+### Database Connection Decorator
+
+1. **Setup**: Creates database connection
+2. **Injection**: Passes connection as first argument to the decorated function
+3. **Execution**: Calls the original function with the connection
+4. **Cleanup**: Ensures connection is closed in finally block (even on errors)
+5. **Return**: Returns the result from the original function
+
+## Argument Handling
+
+### Log Queries Decorator
+
+* **Positional Arguments**: `fetch_all_users("SELECT * FROM users")`
+
+* **Keyword Arguments**: `fetch_all_users(query="SELECT * FROM users")`
+* **Fallback**: Logs `"No query provided"` if query not found
+
+### Database Connection Decorator
+
+* **Connection Injection**: Automatically passes `conn` as first parameter
+
+* **Argument Forwarding**: All other arguments passed through unchanged
+* **Error Safety**: Connection cleanup guaranteed via try/finally
+
+## Best Practices
+
+1. **Connection Management**: Always use the connection decorator for functions that need database access
+2. **Query Logging**: Use query logging decorator during development and debugging
+3. **Error Handling**: Both decorators handle errors gracefully
+4. **Resource Cleanup**: Connections are automatically closed, preventing resource leaks
+5. **Function Signatures**: Decorated functions must accept `conn` as first parameter when using `@with_db_connection`
+
+## File Structure
+
+```text
+python-decorators/
+├── 0-log_queries.py
+├── 1-with_db_connection.py
+├── users.db
+└── README.md
+```
+
+## Django Integration
+
+For Django projects, consider using Django's built-in connection management:
+
+```python
+from django.db import transaction
+
+@transaction.atomic
+def get_user_by_id(user_id):
+    return User.objects.get(id=user_id)
+```
+
+## Testing
+
+```python
+# Test setup
+def setup_database():
+    conn = sqlite3.connect('database.db')
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT
+        )
+    ''')
+    cursor.execute("INSERT OR IGNORE INTO users (id, name, email) VALUES (1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')")
+    conn.commit()
+    conn.close()
+
+# Run tests
+if __name__ == "__main__":
+    setup_database()
+    
+    # Test connection decorator
+    user = get_user_by_id(user_id=1)
+    print(f"User: {user}")
+    
+    # Test query logging
+    users = fetch_all_users("SELECT * FROM users")
+    print(f"All users: {users}")
 ```
 
 ## Expected Output
 
 ```bash
 Executing SQL Query: SELECT * FROM users
+User: (1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')
+All users: [(1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')]
 ```
 
 ## License
