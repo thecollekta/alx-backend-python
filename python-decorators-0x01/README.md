@@ -9,6 +9,7 @@ A collection of Python decorators for database operations, including query loggi
 * **Automatic Query Logging**: Monitor and debug SQL queries before execution
 * **Database Connection Management**: Automatic connection lifecycle handling
 * **Transaction Management**: Automatic commit/rollback handling for database operations
+* **Retry Mechanism**: Automatic retry on failure with configurable attempts and delays
 * **Flexible Argument Handling**: Supports both positional and keyword arguments
 * **Function Metadata Preservation**: Uses `functools.wraps` to maintain original function properties
 * **Non-intrusive**: No modification required to existing database functions
@@ -21,6 +22,8 @@ No external dependencies required. Only uses Python standard library modules:
 ```python
 import sqlite3
 import functools
+import time
+from datetime import datetime
 ```
 
 ## Decorators
@@ -202,9 +205,100 @@ update_user_email(user_id=1, new_email="<kwame.nkrumah@gmail.com>")
 # Transaction rolled back due to an error
 ```
 
+### Retry on Failure Decorator
+
+A decorator that automatically retries function calls on failure with configurable retry attempts and delays.
+
+Implementation:
+
+```python
+import functools
+import time
+
+def retry_on_failure(retries=3, delay=1):
+    """
+    A decorator that retries a function call on failure.
+
+    Args:
+        retries (int): Number of retry attempts (default: 3)
+        delay (int): Delay between retries in seconds (default: 1)
+        
+    Returns:
+        decorator: The decorator function
+    """
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(retries):
+                try:
+                    # Attempt to run function
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    print(f"Attempt {attempt + 1}/{retries} failed: {str(e)}")
+                    
+                    # Don't sleep after the last attempt
+                    if attempt < retries - 1:
+                        time.sleep(delay)
+            
+            print("All retries failed.")
+            raise last_exception
+        
+        return wrapper
+    return decorator
+
+@with_db_connection
+@retry_on_failure(retries=3, delay=1)
+def fetch_users_with_retry(conn):
+    """Fetch users with automatic retry on failure."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users")
+    return cursor.fetchall()
+```
+
+Usage Example:
+
+```python
+# Fetch users with automatic retry on failure
+users = fetch_users_with_retry()
+print(users)
+
+# Output on success
+# [(1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')]
+
+# Output on failure
+# Attempt 1/3 failed: database is locked
+# Attempt 2/3 failed: database is locked
+# Attempt 3/3 failed: database is locked
+# All retries failed
+# sqlite3.OperationalError: database is locked
+```
+
+Configuration Options
+
+```python
+# Default settings (3 retries, 1 second delay)
+@retry_on_failure()
+def basic_retry_function():
+    pass
+
+# Custom settings (5 retries, 2 second delay)
+@retry_on_failure(retries=5, delay=2)
+def custom_retry_function():
+    pass
+
+# Single retry with no delay
+@retry_on_failure(retries=1, delay=0)
+def single_retry_function():
+    pass
+```
+
 ## Combined Usage
 
 You can combine both decorators for comprehensive database function enhancement:
+
+Basic Combination:
 
 ```python
 @log_queries
@@ -219,12 +313,15 @@ def get_user_with_logging(conn, query, user_id):
 user = get_user_with_logging("SELECT * FROM users WHERE id = ?", user_id=1)
 ```
 
+Advanced Combination:
+
 ```python
-@log_queries
+log_queries
 @with_db_connection
+@retry_on_failure(retries=3, delay=1)
 @transactional
 def complex_database_operation(conn, query, user_id, new_data):
-    """Complex operation with logging, connection management, and transactions."""
+    """Complex operation with logging, connection management, retry, and transactions."""
     cursor = conn.cursor()
     cursor.execute(query, (new_data, user_id))
     return cursor.rowcount
@@ -263,14 +360,23 @@ rows_affected = complex_database_operation(
 4. **Exception Handling**: Re-raises the original exception after rollback
 5. **Return**: Returns the result from the original function
 
+### Retry on Failure Decorator (HowIt Works)
+
+1. Loop: Attempts to execute the function up to retries times
+2. Success Path: Returns the result immediately on successful execution
+3. Error Path: Catches exceptions and logs attempt failures
+4. Delay: Waits for specified delay between attempts (except after last attempt)
+5. Final Failure: Raises the last exception if all attempts fail
+
 #### Decorator Stacking Order
 
-When using multiple decorators, they are applied bottom-up:
+When using multiple decorators, they are applied bottom-up. The order matters for proper functionality:
 
 ```python
-@with_db_connection
-@transactional
-def update_user_email(conn, user_id, new_email):
+@with_db_connection # 4th: Handles connection lifecycle
+@retry_on_failure(retries=3, delay=1)   # 3rd: Retries on failure
+@transactional  # 2nd: Manages transactions
+def update_user_email(conn, user_id, new_email):  # 1st: Original function
     # Function implementation
 ```
 
@@ -301,6 +407,13 @@ def update_user_email(conn, user_id, new_email):
 * **Automatic Rollback**: Rolls back transaction on any exception
 * **Exception Propagation**: Re-raises original exceptions after rollback
 
+### Retry on Failure Decorator
+
+* **Configurable Attempts**: Specify number of retries (default: 3)
+* **Configurable Delay**: Specify delay between retries in seconds (default: 1)
+* **Exception Handling**: Preserves and re-raises the last exception
+* **Attempt Logging**: Logs each failed attempt with error details
+
 ## Best Practices
 
 1. **Connection Management**: Always use the connection decorator for functions that need database access
@@ -318,6 +431,7 @@ python-decorators/
 ├── 0-log_queries.py
 ├── 1-with_db_connection.py
 ├── 2-transactional.py
+├── 3-retry_on_failure.py
 ├── users.db
 └── README.md
 ```
@@ -328,16 +442,48 @@ For Django projects, consider using Django's built-in connection management:
 
 ```python
 from django.db import transaction
+from django.core.exceptions import ValidationError
+import logging
 
-@transaction.atomic
-def get_user_by_id(user_id):
-    return User.objects.get(id=user_id)
+logger = logging.getLogger(__name__)
 
+def log_queries_django(func):
+    """Django-compatible query logging decorator."""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        logger.info(f"Executing database operation: {func.__name__}")
+        return func(*args, **kwargs)
+    return wrapper
+
+def retry_on_failure_django(retries=3, delay=1):
+    """Django-compatible retry decorator with proper logging."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exception = e
+                    logger.warning(f"Attempt {attempt + 1}/{retries} failed for {func.__name__}: {str(e)}")
+                    if attempt < retries - 1:
+                        time.sleep(delay)
+            
+            logger.error(f"All {retries} attempts failed for {func.__name__}")
+            raise last_exception
+        return wrapper
+    return decorator
+
+@retry_on_failure_django(retries=3, delay=1)
 @transaction.atomic
-def update_user_email(user_id, new_email):
+def update_user_email_django(user_id, new_email):
+    """Django model operation with retry and transaction management."""
+    from myapp.models import User
     user = User.objects.get(id=user_id)
     user.email = new_email
     user.save()
+    return user
 ```
 
 ## Testing
