@@ -14,6 +14,10 @@ A collection of Python decorators for database operations, including query loggi
 * **Function Metadata Preservation**: Uses `functools.wraps` to maintain original function properties
 * **Non-intrusive**: No modification required to existing database functions
 * **Resource Safety**: Proper cleanup with try/finally blocks
+* **Query Caching**: Avoid redundant database calls with automatic result caching
+* **Time-based Expiration**: Configurable cache expiration time (default: 10 seconds)
+* **Efficient Resource Usage**: Reduces database load for repeated queries
+* **Transparent Integration**: Works seamlessly with existing database functions
 
 ## Installation
 
@@ -205,7 +209,7 @@ update_user_email(user_id=1, new_email="<kwame.nkrumah@gmail.com>")
 # Transaction rolled back due to an error
 ```
 
-### Retry on Failure Decorator
+### 4. Retry on Failure Decorator
 
 A decorator that automatically retries function calls on failure with configurable retry attempts and delays.
 
@@ -294,6 +298,90 @@ def single_retry_function():
     pass
 ```
 
+### 5. Query Caching Decorator
+
+A decorator that caches database query results with time-based expiration to avoid redundant database calls.
+
+Implementation:
+
+```python
+import functools
+import time
+
+query_cache = {}
+
+def cache_query(func):
+    """
+    Decorator that caches the results of a database query.
+    """
+    @functools.wraps(func)
+    def wrapper(conn, query):
+        current_time = time.time()
+        
+        # Check if query exists in cache and hasn't expired
+        if query in query_cache:
+            result, timestamp = query_cache[query]
+            if current_time - timestamp < 10:
+                print("Returning results from cache.")
+                return result
+            else:
+                print("Cache expired. Querying database again.")
+        else:
+            print("Querying database and caching result.")
+            
+        # Execute query and cache result with timestamp
+        result = func(conn, query)
+        query_cache[query] = (result, current_time)
+        print("Cached new result.")
+        return result
+    return wrapper
+
+@with_db_connection
+@cache_query
+def fetch_users_with_cache(conn, query):
+    """Fetch users with automatic query caching."""
+    cursor = conn.cursor()
+    cursor.execute(query)
+    return cursor.fetchall()
+```
+
+Usage Example:
+
+```python
+# First call - caches result
+users = fetch_users_with_cache(query="SELECT * FROM users")
+print(users)
+
+# Second call (within 10s) - uses cache
+users_again = fetch_users_with_cache(query="SELECT * FROM users")
+print(users_again)
+
+# After cache expiration - fetches fresh data
+time.sleep(11)
+users_expired = fetch_users_with_cache(query="SELECT * FROM users")
+print(users_expired)
+```
+
+Expected Output:
+
+```bash
+(1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')
+
+First call:
+Querying database and caching result.
+Cached new result.
+[(1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')]
+
+Second call:
+Returning results from cache.
+[(1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')]
+
+Waiting 11 seconds...
+Third call (after expiration):
+Cached new result.
+[(1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')]
+```
+
 ## Combined Usage
 
 You can combine both decorators for comprehensive database function enhancement:
@@ -316,21 +404,21 @@ user = get_user_with_logging("SELECT * FROM users WHERE id = ?", user_id=1)
 Advanced Combination:
 
 ```python
-log_queries
+@log_queries
 @with_db_connection
+@cache_query
 @retry_on_failure(retries=3, delay=1)
 @transactional
-def complex_database_operation(conn, query, user_id, new_data):
-    """Complex operation with logging, connection management, retry, and transactions."""
+def complex_database_operation(conn, query, params):
+    """Complex operation with logging, connection, caching, retry, and transactions."""
     cursor = conn.cursor()
-    cursor.execute(query, (new_data, user_id))
-    return cursor.rowcount
+    cursor.execute(query, params)
+    return cursor.fetchall()
 
 # Usage
-rows_affected = complex_database_operation(
-    "UPDATE users SET name = ? WHERE id = ?", 
-    user_id=1, 
-    new_data="Updated Name"
+results = complex_database_operation(
+    "SELECT * FROM users WHERE active = ?", 
+    (1,)
 )
 ```
 
@@ -362,29 +450,39 @@ rows_affected = complex_database_operation(
 
 ### Retry on Failure Decorator (HowIt Works)
 
-1. Loop: Attempts to execute the function up to retries times
-2. Success Path: Returns the result immediately on successful execution
-3. Error Path: Catches exceptions and logs attempt failures
-4. Delay: Waits for specified delay between attempts (except after last attempt)
-5. Final Failure: Raises the last exception if all attempts fail
+1. **Loop**: Attempts to execute the function up to retries times
+2. **Success Path**: Returns the result immediately on successful execution
+3. **Error Path**: Catches exceptions and logs attempt failures
+4. **Delay**: Waits for specified delay between attempts (except after last attempt)
+5. **Final Failure**: Raises the last exception if all attempts fail
+
+### Query Caching Decorator (How It Works)
+
+1. **Cache Check**: Looks for existing cache entry when function is called
+2. **Expiration Check**: Validates if cached result is still fresh (within 10 seconds)
+3. **Cache Hit**: Returns cached result immediately if valid
+4. **Cache Miss**: Executes query and stores result with current timestamp
+5. Automatic Refresh: Expired entries trigger fresh database queries
 
 #### Decorator Stacking Order
 
 When using multiple decorators, they are applied bottom-up. The order matters for proper functionality:
 
 ```python
-@with_db_connection # 4th: Handles connection lifecycle
-@retry_on_failure(retries=3, delay=1)   # 3rd: Retries on failure
-@transactional  # 2nd: Manages transactions
-def update_user_email(conn, user_id, new_email):  # 1st: Original function
-    # Function implementation
+@with_db_connection # 5th: Connection management
+@cache_query    # 4th: Result caching
+@retry_on_failure(retries=3)    # 3rd: Error retries
+@transactional  # 2nd: Transaction handling
+def get_data(conn, query):  # 1st: Original function
+    # Implementation
 ```
 
 **Execution Order**:
 
-1. `transactional` wraps the original function first
-2. `with_db_connectio`n wraps the result of `transactional`
-3. Connection is created → Transaction is managed → Function executes
+1. Transaction management
+2. Retry on failure
+3. Query caching
+4. Connection management
 
 ## Argument Handling
 
@@ -414,6 +512,13 @@ def update_user_email(conn, user_id, new_email):  # 1st: Original function
 * **Exception Handling**: Preserves and re-raises the last exception
 * **Attempt Logging**: Logs each failed attempt with error details
 
+### Query Caching Decorator
+
+* **Query-Based Caching**: Uses SQL query string as cache key
+* **Time-Based Expiration**: Default 10-second cache lifetime
+* **Transparent Updates**: Automatically refreshes stale cache
+* **Connection Handling**: Requires connection from `@with_db_connection`
+
 ## Best Practices
 
 1. **Connection Management**: Always use the connection decorator for functions that need database access
@@ -432,6 +537,7 @@ python-decorators/
 ├── 1-with_db_connection.py
 ├── 2-transactional.py
 ├── 3-retry_on_failure.py
+├── 4-cache_query.py
 ├── users.db
 └── README.md
 ```
@@ -522,6 +628,22 @@ if __name__ == "__main__":
     # Verify update
     updated_user = get_user_by_id(user_id=1)
     print(f"Updated user: {updated_user}")
+
+# Test caching functionality
+print("\nTesting cache:")
+# First call - cache miss
+users = fetch_users_with_cache(query="SELECT * FROM users")
+print(f"First call: {users}")
+
+# Second call - cache hit
+users_again = fetch_users_with_cache(query="SELECT * FROM users")
+print(f"Second call: {users_again}")
+
+# Wait for cache expiration
+time.sleep(11)
+# Third call - cache expired
+users_expired = fetch_users_with_cache(query="SELECT * FROM users")
+print(f"Third call: {users_expired}")
 ```
 
 ## Expected Output
@@ -530,6 +652,16 @@ if __name__ == "__main__":
 Executing SQL Query: SELECT * FROM users
 User: (1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')
 All users: [(1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')]
+
+Testing cache:
+Querying database and caching result.
+Cached new result.
+First call: [(1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')]
+Returning results from cache.
+Second call: [(1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')]
+Cache expired. Querying database again.
+Cached new result.
+Third call: [(1, 'Kwame Nkrumah', 'kwame.nkrumah@ghana.com')]
 ```
 
 ## License
