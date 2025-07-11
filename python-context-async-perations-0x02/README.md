@@ -2,7 +2,7 @@
 
 ## Database Context Manager
 
-A custom class-based context manager for handling SQLite database connections with automatic resource management and query execution.
+A custom class-based context manager for handling SQLite database connections with automatic resource management, query execution, and concurrent asynchronous operations using `asyncio`.
 
 ## Overview
 
@@ -10,6 +10,7 @@ This project implements a context manager pattern to ensure proper database conn
 
 1. **DatabaseConnection** - Basic connection management
 2. **ExecuteQuery** - Query execution with parameter binding
+3. **Concurrent Async Operations** - Multiple database queries running concurrently using asyncio.gather()
 
 ## Features
 
@@ -18,6 +19,8 @@ This project implements a context manager pattern to ensure proper database conn
 * **Simple Interface** : Clean, Pythonic API using the `with` statement
 * **Parameterized Queries**: Support for safe parameter binding to prevent SQL injection
 * **Query Execution**: Direct query execution with result fetching
+* **Concurrent Operations**: Multiple database queries executed simultaneously using `asyncio`
+* **Asynchronous Database Access**: Non-blocking database operations with `aiosqlite`
 * **Error Handling** : Robust error handling for database operations
 
 ## Project Structure
@@ -26,7 +29,14 @@ This project implements a context manager pattern to ensure proper database conn
 python-context-async-perations-0x02/
 ├── 0-databaseconnection.py
 ├── 1-execute.py
+├── 3-concurrent.py
 └── README.md
+```
+
+## Requirements
+
+```bash
+pip install aiosqlite
 ```
 
 ## Usage
@@ -52,13 +62,16 @@ cursor.execute("""
 """)
 
 # Insert sample data
-cursor.execute("INSERT INTO users (name, email, age) VALUES (?, ?, ?)", 
-               ("Kwame Nkrumah", "kwame.nkrumah@ghana.com", 30))
-cursor.execute("INSERT INTO users (name, email, age) VALUES (?, ?, ?)", 
-               ("Yaa Asantewaa", "yaa.asantewaa@ghana.com", 28))
-cursor.execute("INSERT INTO users (name, email, age) VALUES (?, ?, ?)", 
-               ("Okomfo Anokye", "okomfo.anokye@ghana.com", 22))
+users_data = [
+    ("Kwame Nkrumah", "kwame.nkrumah@ghana.com", 45),
+    ("Yaa Asantewaa", "yaa.asantewaa@ghana.com", 28),
+    ("Okomfo Anokye", "okomfo.anokye@ghana.com", 22),
+    ("Kofi Karikari", "kofi.karikari@ghana.com", 42),
+    ("Nana Akoto", "nana.akoto@ghana.com", 35),
+    ("Akosua Manu", "akosua.manu@ghana.com", 50)
+]
 
+cursor.executemany("INSERT INTO users (name, email, age) VALUES (?, ?, ?)", users_data)
 conn.commit()
 conn.close()
 ```
@@ -78,6 +91,26 @@ with ExecuteQuery("users.db", query, age_param) as users:
         print(f"ID: {user[0]}, Name: {user[1]}, Email: {user[2]}, Age: {user[3]}")
 ```
 
+### Concurrent Asynchronous Database Queries
+
+The project includes concurrent database operations using `asyncio.gather()` for improved performance when executing multiple independent queries.
+
+```python
+import asyncio
+from 3-concurrent import fetch_concurrently
+
+# Run concurrent database queries
+asyncio.run(fetch_concurrently())
+```
+
+#### How Concurrent Queries Work
+
+The `3-concurrent.py` module demonstrates running multiple database queries simultaneously:
+
+**async_fetch_users()**: Fetches all users from the database
+**async_fetch_older_users()**: Fetches users older than 40
+**fetch_concurrently()**: Orchestrates concurrent execution using `asyncio.gather()`
+
 ## Implementation Details
 
 ### Context Manager Protocol
@@ -86,6 +119,14 @@ The `DatabaseConnection` class implements the context manager protocol through t
 
 * `__enter__()`: Called when entering the `with` block, establishes database connection
 * `__exit__()`: Called when exiting the `with` block, closes the connection
+
+### Asynchronous Operations
+
+The concurrent implementation uses:
+
+**aiosqlite**: Asynchronous SQLite database adapter
+**asyncio.gather()**: Executes multiple coroutines concurrently
+**async context managers**: Proper resource management in asynchronous code
 
 ### Error Handling
 
@@ -102,7 +143,7 @@ except sqlite3.OperationalError as e:
 
 ## Testing
 
-To test the context manager:
+### Test Context Manager
 
 ```python
 # Test basic functionality
@@ -114,6 +155,26 @@ with DatabaseConnection("test.db") as conn:
     print(cursor.fetchall())
 ```
 
+### Test Concurrent Operations
+
+```python
+import asyncio
+import time
+
+async def test_concurrent_performance():
+    """Test the performance improvement of concurrent operations."""
+    start_time = time.time()
+    
+    # Run concurrent queries
+    await fetch_concurrently()
+    
+    end_time = time.time()
+    print(f"Concurrent execution time: {end_time - start_time:.2f} seconds")
+
+# Run the performance test
+asyncio.run(test_concurrent_performance())
+```
+
 ## Best Practices Demonstrated
 
 1. **Resource Management** : Automatic cleanup of database connections
@@ -123,6 +184,8 @@ with DatabaseConnection("test.db") as conn:
 5. **Parameter Binding**: Safe handling of query parameters
 6. **Single Responsibility**: Each context manager has a focused purpose
 7. **Error Handling**: Robust error handling for database operations
+8. **Concurrent Programming**: Efficient use of `asyncio.gather()` for parallel operations
+9. **Asynchronous Context Managers**: Proper resource management in async code
 
 ## Common Use Cases
 
@@ -131,6 +194,8 @@ with DatabaseConnection("test.db") as conn:
 * **Database migrations**: Safe data transfer operations
 * **Data analysis scripts**: Generating reports with parameterized queries
 * **Testing database operations**: Testing database operations with automatic cleanup
+* **API endpoints**: Fetching data from multiple sources concurrently
+* **Data aggregation**: Combining results from multiple database queries efficiently
 
 ## Troubleshooting
 
@@ -139,6 +204,8 @@ with DatabaseConnection("test.db") as conn:
 1. **Database not found** : Ensure the database file exists or handle creation
 2. **Permission errors** : Check file permissions for the database
 3. **Connection not closed** : The context manager handles this automatically
+4. **Import errors**: Ensure `aiosqlite` is installed: `pip install aiosqlite`
+5. **Async syntax errors**: Ensure proper use of `async`/`await` keywords
 
 ### Debug Mode
 
@@ -147,6 +214,15 @@ For debugging, you can enable verbose logging:
 ```python
 import logging
 logging.basicConfig(level=logging.DEBUG)
+```
+
+### Async Debugging
+
+```python
+import asyncio
+
+# Enable asyncio debug mode
+asyncio.run(fetch_concurrently(), debug=True)
 ```
 
 ## Performance Considerations
