@@ -68,8 +68,7 @@ class TestGithubOrgClient(unittest.TestCase):
             {"name": "repo1", "license": {"key": "mit"}},
             {"name": "repo2", "license": {"key": "apache-2.0"}},
             {"name": "repo3", "license": None}
-        ]
-        
+        ]        
         # Configure mocks
         mock_get_json.return_value = test_payload
         with patch.object(
@@ -80,16 +79,14 @@ class TestGithubOrgClient(unittest.TestCase):
         ) as mock_public_repos_url:
             # Create client instance
             client = GithubOrgClient("google")
-            
             # Call the method
-            repos = client.public_repos()
-            
+            repos = client.public_repos()            
             # Assert the result matches expected repo names
             self.assertEqual(repos, ["repo1", "repo2", "repo3"])
             # Assert mocks were called correctly
             mock_public_repos_url.assert_called_once()
             mock_get_json.assert_called_once_with(test_url)
-    
+
     @parameterized.expand([
         ({"license": {"key": "my_license"}}, "my_license", True),
         ({"license": {"key": "other_license"}}, "my_license", False),
@@ -98,4 +95,3 @@ class TestGithubOrgClient(unittest.TestCase):
         """Test that has_license returns the correct boolean value."""
         result = GithubOrgClient.has_license(repo, license_key)
         self.assertEqual(result, expected)
-
