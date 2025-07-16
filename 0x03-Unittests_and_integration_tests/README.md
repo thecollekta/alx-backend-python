@@ -51,4 +51,6 @@ This project covers Python testing strategies including:
 6. `_public_repos_url` - uses `patch.object` with `new_callable=PropertyMock` to override the behavior of the `.org` property so that we can test method `_public_repos_url` without triggering real HTTP requests.
 
 7. `public_repos` - mocked `_public_repos_url` and `get_json` using `@patch` and `PropertyMock` which verified and returned repo list while ensuring both mocks were called exactly once.
+
+8. `has_license` - parameterized unit test for `GitHubOrgClient.has_license` ensuring both matching and non-matching license key case.
  
