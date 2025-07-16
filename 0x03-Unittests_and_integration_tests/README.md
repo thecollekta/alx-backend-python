@@ -34,7 +34,7 @@ This project covers Python testing strategies including:
 
 2. `test_access_map_exception` - to validate that a `KeyError` is raised when a non-existent path is accessed.
 
-	* Example: `access_nested_map({}, ("a",)) raises `KeyError: 'a'`.
+	* Example: `access_nested_map({}, ("a",))` raises `KeyError: 'a'`.
 
 3. `TestGetJson.test_get_json` - to ensure that `utils.get_json` performs as expected without making real HTTP calls.
 
@@ -46,7 +46,9 @@ This project covers Python testing strategies including:
 
 4. `momoize` decorator - uses `unittest.mock.patch` to ensure that memoized property only triggers the the underlying method once.
 
-5.`TestGitHubOrgClient.org` - uses the `@patch` to mock the `get_json` function to avoid real HTTP calls and verifies that `get_json` is called once with the correct URL.
+5. `TestGitHubOrgClient.org` - uses the `@patch` to mock the `get_json` function to avoid real HTTP calls and verifies that `get_json` is called once with the correct URL.
 
 6. `_public_repos_url` - uses `patch.object` with `new_callable=PropertyMock` to override the behavior of the `.org` property so that we can test method `_public_repos_url` without triggering real HTTP requests.
+
+7. `public_repos` - mocked `_public_repos_url` and `get_json` using `@patch` and `PropertyMock` which verified and returned repo list while ensuring both mocks were called exactly once.
  
