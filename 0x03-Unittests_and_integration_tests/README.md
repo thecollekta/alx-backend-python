@@ -1,56 +1,134 @@
-# Unittest and Integration Tests
+# Unittests and Integration Tests
 
-This project covers Python testing strategies including:
+This project contains Python tasks focused on learning unit testing and integration testing concepts. The goal is to understand how to write effective tests using Python's `unittest` framework, including techniques like mocking, parametrization, and fixtures.
 
-- Unit testing with `unittest`
-- Parameterized testing using `parameterized`
-- Mocking with `unittest.mock`
-
-## Prerequsite
+## Prerequisite
 
 - Python 3.7
 - `unittest` and `parameterized` libraries
 - Ubuntu 18.04 LTS
-- Pycodestyle 2.5
-- SQLite3 (for integration tests)
-- Git and GitHub
+- All files should end with a new line.
+- The first line of all files should be `#!/usr/bin/env python3`.
+- Code must use the pycodestyle style (version 2.5).
+- All files must be executable.
+- All modules, classes, and functions must have documentation.
 
 ## Project Structure
 
 ```bash
-.
 ├── 0x03-Unittests_and_integration_tests/
 │   ├── test_utils.py              # Unit tests for utils.py
 │   ├── client.py                  # Client logic
 │   └── README.md                  # Project documentation
 ```
 
+## Task Documentation
 
-## Tests Implemented
+### [0. Parameterize a unit test](./test_utils.py)
 
-1. `test_access_nested_map` -  to validate successful access of nested values in a dictionary like object using parameterized inputs.
+**File**: `test_utils.py`
+Tests `access_nested_map` function with valid paths. Uses parameterized testing to verify:
 
-	* Example: access_nested_map({"a": {"b": 2}}, ("a", "b"))` returns `2`.
+- Accessing top-level keys
+- Accessing nested dictionaries
+- Accessing deeply nested values
 
-2. `test_access_map_exception` - to validate that a `KeyError` is raised when a non-existent path is accessed.
+### [1. Parameterize a unit test](./test_utils.py)
 
-	* Example: `access_nested_map({}, ("a",))` raises `KeyError: 'a'`.
+**File**: `test_utils.py`
+Tests `access_nested_map` function raises `KeyError` for invalid paths. Verifies:
 
-3. `TestGetJson.test_get_json` - to ensure that `utils.get_json` performs as expected without making real HTTP calls.
+- `KeyError` is raised for missing keys
+- Exception message matches the missing key
 
-	* **Test performed**:
-	    - The mock is called exactly once with the correct URL: 
-		* `"http://example.com"` -> `{"payload": True}`
-		* `"http://holberton.io"` -> `{"payload": False}`
-	    - The return value matches the mocked JSON payload.
+### [2. Mock HTTP calls](./test_utils.py)
 
-4. `momoize` decorator - uses `unittest.mock.patch` to ensure that memoized property only triggers the the underlying method once.
+**File**: `test_utils.py`
+Tests `get_json` function without making actual HTTP calls. Uses mocking to:
 
-5. `TestGitHubOrgClient.org` - uses the `@patch` to mock the `get_json` function to avoid real HTTP calls and verifies that `get_json` is called once with the correct URL.
+- Simulate API responses
+- Verify correct URL is called
+- Ensure response matches expected payload
 
-6. `_public_repos_url` - uses `patch.object` with `new_callable=PropertyMock` to override the behavior of the `.org` property so that we can test method `_public_repos_url` without triggering real HTTP requests.
+### [3. Parameterize and patch](./test_utils.py)
 
-7. `public_repos` - mocked `_public_repos_url` and `get_json` using `@patch` and `PropertyMock` which verified and returned repo list while ensuring both mocks were called exactly once.
+**File**: `test_utils.py`
+Tests the memoize decorator. Verifies:
 
-8. `has_license` - parameterized unit test for `GitHubOrgClient.has_license` ensuring both matching and non-matching license key case.
- 
+- Method results are cached
+- Underlying method is called only once
+- Subsequent calls return cached result
+
+### [4. Parameterize and patch as decorators](./test_client.py)
+
+**File**: `test_client.py`
+Tests `GithubOrgClient.org` method. Uses:
+
+- Parameterization for different organizations
+- Mocking to prevent actual API calls
+- Verification of correct URL formatting
+
+### [5. Mocking a property](./test_client.py)
+
+**File**: `test_client.py`
+Tests `GithubOrgClient._public_repos_url` property. Uses:
+
+- Context manager patching
+- Mocked organization payload
+- Verification of correct URL extraction
+
+### [6. More patching](./test_client.py)
+
+**File**: `test_client.py`
+Tests `GithubOrgClient.public_repos` method. Verifies:
+
+- Repository names are correctly extracted
+- Mocked dependencies are called properly
+- Both public_repos_url and get_json are used correctly
+
+### [7. Parameterize](./test_client.py)
+
+**File**: `test_client.py`
+Tests `GithubOrgClient.has_license` method. Uses parameterized tests for:
+
+- Repositories with matching licenses
+- Repositories with different licenses
+- Expected boolean results
+
+### [8. Integration test: fixtures](./test_client.py)
+
+**File**: `test_client.py`
+Sets up integration test environment for `GithubOrgClient`. Implements:
+
+- Class-level setup and teardown
+- Mocking of requests.get with fixtures
+- Parameterized test class using fixture data
+
+### [9. Integration tests](./test_client.py)
+
+**File**: test_client.py
+Implements integration tests for public_repos method. Tests:
+
+- Retrieval of public repositories without license filter
+- Filtering of repositories by "apache-2.0" license
+- Verification against expected fixture results
+
+## How to Run Tests
+
+```bash
+# Run all tests
+python -m unittest discover
+
+# Run specific test file
+python -m unittest test_utils.py
+python -m unittest test_client.py
+```
+
+## Resources
+
+- [unittest — Unit testing framework](https://docs.python.org/3/library/unittest.html)
+- [unittest.mock — mock object library](https://docs.python.org/3/library/unittest.mock.html)
+- [How to mock a readonly property with mock?](https://stackoverflow.com/questions/11836436/how-to-mock-a-readonly-property-with-mock)
+- [parameterized](https://pypi.org/project/parameterized/)
+- [Memoization](https://en.wikipedia.org/wiki/Memoization)
+
