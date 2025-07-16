@@ -68,7 +68,7 @@ class TestGithubOrgClient(unittest.TestCase):
             {"name": "repo1", "license": {"key": "mit"}},
             {"name": "repo2", "license": {"key": "apache-2.0"}},
             {"name": "repo3", "license": None}
-        ]        
+        ] 
         # Configure mocks
         mock_get_json.return_value = test_payload
         with patch.object(
@@ -80,7 +80,7 @@ class TestGithubOrgClient(unittest.TestCase):
             # Create client instance
             client = GithubOrgClient("google")
             # Call the method
-            repos = client.public_repos()            
+            repos = client.public_repos()
             # Assert the result matches expected repo names
             self.assertEqual(repos, ["repo1", "repo2", "repo3"])
             # Assert mocks were called correctly
