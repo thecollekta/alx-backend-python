@@ -68,7 +68,7 @@ class TestGithubOrgClient(unittest.TestCase):
             {"name": "repo1", "license": {"key": "mit"}},
             {"name": "repo2", "license": {"key": "apache-2.0"}},
             {"name": "repo3", "license": None}
-        
+        ]
         # Configure mocks
         mock_get_json.return_value = test_payload
         with patch.object(
