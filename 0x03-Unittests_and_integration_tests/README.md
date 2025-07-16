@@ -5,7 +5,7 @@ This project covers Python testing strategies including:
 - Unit testing with `unittest`
 - Parameterized testing using `parameterized`
 
-## Prerequsit
+## Prerequsite
 
 - Python 3.7
 - `unittest` and `parameterized` libraries
@@ -22,3 +22,12 @@ This project covers Python testing strategies including:
 │   ├── test_utils.py              # Unit tests for utils.py
 │   └── README.md                  # Project documentation
 
+## Tests Implemented
+
+1. `test_access_nested_map` to validate successful access of nested values in a dictionary like object using parameterized inputs.
+
+	* Example: access_nested_map({"a": {"b": 2}}, ("a", "b")) returns `2`.
+
+2. `test_access_map_exception` to validate that a `KeyError` is raised when a non-existent path is accessed.
+
+	* Example: `access_nested_map({}, ("a",)) raises `KeyError: 'a'`.
