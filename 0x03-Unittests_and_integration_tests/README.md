@@ -48,3 +48,5 @@ This project covers Python testing strategies including:
 
 5.`TestGitHubOrgClient.org` - uses the `@patch` to mock the `get_json` function to avoid real HTTP calls and verifies that `get_json` is called once with the correct URL.
 
+6. `_public_repos_url` - uses `patch.object` with `new_callable=PropertyMock` to override the behavior of the `.org` property so that we can test method `_public_repos_url` without triggering real HTTP requests.
+ 
