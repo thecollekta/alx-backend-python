@@ -12,6 +12,8 @@ from .models import Conversation, Message, User
 class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model"""
 
+    user_id = serializers.UUIDField(source="id", read_only=True)
+
     class Meta:
         model = User
         fields = [
@@ -29,28 +31,36 @@ class UserSerializer(serializers.ModelSerializer):
 class MessageSerializer(serializers.ModelSerializer):
     """Serializer for Message model"""
 
+    message_id = serializers.UUIDField(source="id", read_only=True)
     sender = UserSerializer(read_only=True)
 
     class Meta:
         model = Message
-        fields = ["message_id", "sender", "message_body", "sent_at", "conversation"]
+        fields = ["message_id", "sender", "message_body", "sent_at"]
         read_only_fields = ["message_id", "sent_at", "sender"]
-        extra_kwargs = {"conversation": {"write_only": True}}
 
 
 class ConversationListSerializer(serializers.ModelSerializer):
+    conversation_id = serializers.UUIDField(source="id", read_only=True)
     participants = UserSerializer(many=True, read_only=True)
     last_message = serializers.SerializerMethodField()
 
     class Meta:
         model = Conversation
-        fields = ["id", "participants", "created_at", "last_message"]
-        read_only_fields = ["id", "created_at"]
+        fields = ["conversation_id", "participants", "created_at", "last_message"]
+        read_only_fields = ["conversation_id", "created_at"]
+
+    def get_last_message(self, obj):
+        last_message = obj.messages.order_by("-sent_at").first()
+        if last_message:
+            return MessageSerializer(last_message).data
+        return None
 
 
 class ConversationDetailSerializer(serializers.ModelSerializer):
     """Serializer for Conversation model with nested participants and messages"""
 
+    conversation_id = serializers.UUIDField(source="id", read_only=True)
     participants = UserSerializer(many=True, read_only=True)
     messages = MessageSerializer(many=True, read_only=True)
 
