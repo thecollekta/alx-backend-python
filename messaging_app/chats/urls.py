@@ -5,13 +5,13 @@ URL configuration for chats app
 """
 
 from django.urls import include, path
-from rest_framework.routers import DefaultRouter
+from rest_framework import routers
 from rest_framework_nested.routers import NestedDefaultRouter
 
 from .views import ConversationViewSet, MessageViewSet
 
 # Create a router and register viewsets
-router = DefaultRouter()
+router = routers.DefaultRouter()
 router.register(r"conversations", ConversationViewSet, basename="conversation")
 
 # Create nested router for messages within conversations
