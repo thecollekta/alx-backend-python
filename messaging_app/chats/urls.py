@@ -15,7 +15,7 @@ router = DefaultRouter()
 router.register(r"conversations", ConversationViewSet, basename="conversation")
 
 # Create nested router for messages within conversations
-conversations_router = routers.NestedDefaultRouter(
+conversations_router = routers.DefaultRouter(
     router, r"conversations", lookup="conversation"
 )
 conversations_router.register(
