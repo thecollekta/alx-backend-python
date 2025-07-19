@@ -1,3 +1,9 @@
+# messaging_app/chats/models.py
+
+"""
+Django models for messaging system
+"""
+
 import uuid
 
 from django.contrib.auth.models import AbstractUser, BaseUserManager

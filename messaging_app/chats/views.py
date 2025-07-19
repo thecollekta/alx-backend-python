@@ -2,6 +2,7 @@
 
 """Viewsets for Conversation and Message models"""
 
+from django.db.models import QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.exceptions import NotFound, PermissionDenied
@@ -80,7 +81,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     ordering = ["-sent_at"]
     search_fields = ["message_body", "sender__first_name", "sender__last_name"]
 
-    def get_queryset(self):
+    def get_queryset(self) -> "QuerySet[Message]":
         # Get conversation ID from URL
         conversation_id = self.kwargs.get("conversation_id")
 

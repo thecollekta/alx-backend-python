@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     "chats",
     # Third party apps
     "rest_framework",
+    "django_filters",
 ]
 
 MIDDLEWARE = [

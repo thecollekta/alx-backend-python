@@ -48,6 +48,9 @@
 * Django REST Framework
 * Python 3.12+
 * django-environ (for environment variables)
+* django-filter (for API filtering)
+* drf-nested-routers (for nested routes)
+* psycopg (PostgreSQL adapter)
 
 ## Project Structure
 
@@ -59,14 +62,16 @@ messaging_app/
 | ├ __init.py__.py
 | ├ admin.py         # Admin panel config
 | ├ apps.py
-| ├ models.py
+| ├ models.py        # Data models
+| ├ serializers.py   # API serializers
 | ├ tests.py
+| ├ urls.py          # API endpoints
 | ├ views.py
 ├ messaging_app/     # Project config
 | ├ __init__.py
 | ├ asgi.py
 | ├ settings.py
-| ├ urls.py
+| ├ urls.py          # Main URL routing
 | ├ wsgi.py
 | ├ .env.example     # Environment variable template
 ├ .gitignore
@@ -105,6 +110,48 @@ messaging_app/
 * Automatic sent timestamp
 * UUID primary key
 
+## Endpoints (Development)
+
+All endpoints are prefixed with `/api/v1/`
+
+### Authentication
+
+* Use DRF's session authentication or token authentication
+* Login via browseable API: `/api-auth/login/`
+
+### Users
+
+* Admin Interface: `/admin/` to manage users, conversations, and messages
+
+### Conversations
+
+|Endpoint        |Method     |Description| Permissions|
+|----------------|-----------|-----------|------------|
+| `/conversations/` |GET |List all conversations where current user is a participant |Authenticated|
+| `/conversations/` |POST| Create new conversation (auto-adds current user) |Authenticated|
+| `/conversations/{conversation_id}/` |GET |Retrieve conversation details with messages |Participant only|
+| `/conversations/{conversation_id}/messages/`| GET |List all messages in conversation |Participant only|
+| `/conversations/{conversation_id}/messages/`| POST| Create new message in conversation |Participant only|
+
+**Filters**:
+
+* Ordering: `?ordering=created_at` (or `-created_at` for descending)
+* Search: `?search=term` (searches participant names/emails)
+
+### Messages
+
+|Endpoint        |Method     |Description| Permissions|
+|----------------|-----------|-----------|------------|
+| `/conversations/{conversation_id}/messages/` |GET |List all messages in conversation |Participant only|
+| `/conversations/{conversation_id}/messages/` |POST |Send new message |Participant only|
+| `/conversations/{conversation_id}/messages/{message_id}/` |GET |Retrieve specific message |Participant only|
+
+**Filters**:
+
+* Filter by sender role: ?sender__role=host
+* Ordering: ?ordering=sent_at (or -sent_at for descending)
+* Search: ?search=term (searches message body or sender names)
+
 ### Admin Panel Features
 
 * Custom User management interface
@@ -113,7 +160,34 @@ messaging_app/
 * Role-based user management
 * Relationship visualization
 
-## Endpoints (Development)
+### Example Requests
 
-* Admin Interface: `http://localhost:8000/admin/`
-* API Root (Coming soon)
+**Create Conversation**:
+
+```bash
+POST /api/v1/conversations/
+{
+    "participant_ids": ["user-uuid-1", "user-uuid-2"]
+}
+```
+
+**Send Message**:
+
+```bash
+POST /api/v1/conversations/{conversation_id}/messages/
+{
+    "message_body": "Hello there!"
+}
+```
+
+**List Conversations**:
+
+```bash
+GET /api/v1/conversations/
+```
+
+***List Messages in Conversation***:
+
+```bash
+GET /api/v1/conversations/{conversation_id}/messages/
+```
