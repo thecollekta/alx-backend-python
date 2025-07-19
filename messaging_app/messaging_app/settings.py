@@ -14,15 +14,28 @@ from pathlib import Path
 
 import environ
 
+# Initialize environ
 env = environ.Env(
-    DEBUG=(bool, False),
+    # Set casting and default values
+    DEBUG=(bool, True),
     SECRET_KEY=(str, "SECRET_KEY"),
-    DJANGO_ALLOWED_HOSTS=(list, ["DJANGO_ALLOWED_HOSTS"]),
+    DJANGO_ALLOWED_HOSTS=(list, ["localhost", "127.0.0.1"]),
+    DB_NAME=(str, "DB_NAME"),
+    DB_USER=(str, "DB_USER"),
+    DB_PASSWORD=(str, "DB_PASSWORD"),
+    DB_HOST=(str, "DB_HOST"),
+    DB_PORT=(str, "DB_PORT"),
 )
-environ.Env.read_env()
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+# Take environment variables from .env file
+env_file = BASE_DIR / ".env"
+if env_file.exists():
+    environ.Env.read_env(env_file)
 
 
 # Quick-start development settings - unsuitable for production
@@ -38,7 +51,6 @@ ALLOWED_HOSTS = env("DJANGO_ALLOWED_HOSTS")
 
 
 # Application definition
-
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -46,6 +58,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "django.contrib.postgres",  # For PostgreSQL index feature
     # Local apps
     "chats",
     # Third party apps
@@ -87,8 +100,12 @@ WSGI_APPLICATION = "messaging_app.wsgi.application"
 
 DATABASES = {
     "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": env("DB_NAME"),
+        "USER": env("DB_USER"),
+        "PASSWORD": env("DB_PASSWORD"),
+        "HOST": env("DB_HOST"),
+        "PORT": env("DB_PORT"),
     }
 }
 
@@ -128,16 +145,16 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# Media files
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# REST Framework Settings
-REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework.authentication.SessionAuthentication",
-    ),
-    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
-}
+AUTH_USER_MODEL = "chats.User"
