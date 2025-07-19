@@ -38,7 +38,17 @@ class MessageSerializer(serializers.ModelSerializer):
         extra_kwargs = {"conversation": {"write_only": True}}
 
 
-class ConversationSerializer(serializers.ModelSerializer):
+class ConversationListSerializer(serializers.ModelSerializer):
+    participants = UserSerializer(many=True, read_only=True)
+    last_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Conversation
+        fields = ["id", "participants", "created_at", "last_message"]
+        read_only_fields = ["id", "created_at"]
+
+
+class ConversationDetailSerializer(serializers.ModelSerializer):
     """Serializer for Conversation model with nested participants and messages"""
 
     participants = UserSerializer(many=True, read_only=True)
@@ -55,8 +65,8 @@ class ConversationSerializer(serializers.ModelSerializer):
             "conversation_id",
             "participants",
             "participant_ids",
-            "messages",
             "created_at",
+            "messages",
         ]
         read_only_fields = ["conversation_id", "created_at", "messages"]
 
