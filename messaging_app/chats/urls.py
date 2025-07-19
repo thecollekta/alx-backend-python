@@ -16,10 +16,10 @@ router.register(r"conversations", ConversationViewSet, basename="conversation")
 # Custom URL patterns for nested routes
 urlpatterns = [
     # Include router URLs
-    path("api/v1/", include(router.urls)),
+    path("", include(router.urls)),
     # Nested route for messages within a conversation
     path(
-        "api/v1/conversations/<uuid:conversation_id>/messages/",
+        "conversations/<uuid:conversation_id>/messages/",
         MessageViewSet.as_view({"get": "list", "post": "create"}),
         name="conversation-messages",
     ),

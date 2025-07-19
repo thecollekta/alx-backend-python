@@ -2,7 +2,8 @@
 
 """Viewsets for Conversation and Message models"""
 
-from rest_framework import permissions, status, viewsets
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, permissions, status, viewsets
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.response import Response
 
@@ -21,10 +22,24 @@ class ConversationViewSet(viewsets.ModelViewSet):
 
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ["get", "post", "head", "options"]  # Disable PUT/PATCH/DELETE
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.OrderingFilter,
+        filters.SearchFilter,
+    ]
+    ordering_fields = ["created_at"]
+    ordering = ["-created_at"]
+    search_fields = [
+        "participants__first_name",
+        "participants__last_name",
+        "participants__email",
+    ]
 
     def get_queryset(self):
         # Get conversations where current user is a participant
-        return Conversation.objects.filter(participants=self.request.user)
+        return Conversation.objects.filter(
+            participants=self.request.user
+        ).prefetch_related("participants", "messages")
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -55,6 +70,15 @@ class MessageViewSet(viewsets.ModelViewSet):
     serializer_class = MessageSerializer
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ["get", "post", "head", "options"]  # Disable PUT/PATCH/DELETE
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.OrderingFilter,
+        filters.SearchFilter,
+    ]
+    filterset_fields = ["sender__role"]
+    ordering_fields = ["sent_at"]
+    ordering = ["-sent_at"]
+    search_fields = ["message_body", "sender__first_name", "sender__last_name"]
 
     def get_queryset(self):
         # Get conversation ID from URL
@@ -69,8 +93,12 @@ class MessageViewSet(viewsets.ModelViewSet):
         if self.request.user not in conversation.participants.all():
             raise PermissionDenied("You are not a participant in this conversation")
 
-        # Return messages for this conversation
-        return Message.objects.filter(conversation=conversation).order_by("-sent_at")
+        # Return messages for this conversation with optimized queries
+        return (
+            Message.objects.filter(conversation=conversation)
+            .select_related("sender", "conversation")
+            .order_by("-sent_at")
+        )
 
     def create(self, request, *args, **kwargs):
         # Get conversation ID from URL
