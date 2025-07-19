@@ -13,6 +13,11 @@ class UserSerializer(serializers.ModelSerializer):
     """Serializer for User model"""
 
     user_id = serializers.UUIDField(source="id", read_only=True)
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    email = serializers.CharField()
+    phone_number = serializers.CharField(allow_blank=True, required=False)
+    role = serializers.CharField()
 
     class Meta:
         model = User
@@ -33,6 +38,7 @@ class MessageSerializer(serializers.ModelSerializer):
 
     message_id = serializers.UUIDField(source="id", read_only=True)
     sender = UserSerializer(read_only=True)
+    message_body = serializers.CharField()
 
     class Meta:
         model = Message
