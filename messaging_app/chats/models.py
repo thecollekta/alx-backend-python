@@ -47,7 +47,7 @@ class User(AbstractUser):
         ("admin", "Admin"),
     ]
 
-    id = models.UUIDField(
+    user_id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False, db_index=True
     )
     first_name = models.CharField(max_length=151, null=False)
@@ -68,20 +68,20 @@ class User(AbstractUser):
 class Conversation(models.Model):
     """Representation of a conversation between two or more users"""
 
-    id = models.UUIDField(
+    conversation_id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False, db_index=True
     )
     participants = models.ManyToManyField(User, related_name="conversations")
     created_at = models.DateField(default=timezone.now)
 
     def __str__(self):
-        return f"Conversation {self.id}"
+        return f"Conversation {self.conversation_id}"
 
 
 class Message(models.Model):
     """Representation of a message sent by a user in a conversation"""
 
-    id = models.UUIDField(
+    message_id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False, db_index=True
     )
     sender = models.ForeignKey(
