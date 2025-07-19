@@ -6,7 +6,7 @@ URL configuration for chats app
 
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from rest_framework_nested import routers
+from rest_framework_nested.routers import NestedDefaultRouter
 
 from .views import ConversationViewSet, MessageViewSet
 
@@ -15,7 +15,7 @@ router = DefaultRouter()
 router.register(r"conversations", ConversationViewSet, basename="conversation")
 
 # Create nested router for messages within conversations
-conversations_router = routers.DefaultRouter(
+conversations_router = NestedDefaultRouter(
     router, r"conversations", lookup="conversation"
 )
 conversations_router.register(
@@ -32,12 +32,12 @@ urlpatterns = [
     path("", include(conversations_router.urls)),
     # Alternative explicit routes if nested router isn't available
     path(
-        "api/v1/conversations/<uuid:conversation_id>/messages/",
+        "conversations/<uuid:conversation_id>/messages/",
         MessageViewSet.as_view({"get": "list", "post": "create"}),
         name="conversation-messages-list",
     ),
     path(
-        "api/v1/conversations/<uuid:conversation_id>/messages/<uuid:pk>/",
+        "conversations/<uuid:conversation_id>/messages/<uuid:pk>/",
         MessageViewSet.as_view(
             {
                 "get": "retrieve",
