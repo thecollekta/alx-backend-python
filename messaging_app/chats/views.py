@@ -113,6 +113,18 @@ class ConversationViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    def get_object(self):
+        """
+        Override to ensure proper permission checking for object retrieval
+        """
+        obj = super().get_object()
+        if not obj.participants.filter(id=self.request.user.id).exists():
+            raise PermissionDenied(
+                "You do not have permission to access this conversation",
+                code=status.HTTP_403_FORBIDDEN,
+            )
+        return obj
+
 
 class MessageViewSet(viewsets.ModelViewSet):
     """
@@ -125,7 +137,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         IsParticipantOfConversation,
         IsMessageOwnerOrReadOnly,
     ]
-    http_method_names = ["get", "post", "head", "options"]  # Disable PUT/PATCH/DELETE
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
     filter_backends = [
         DjangoFilterBackend,
         filters.OrderingFilter,
@@ -146,8 +158,11 @@ class MessageViewSet(viewsets.ModelViewSet):
         except Conversation.DoesNotExist:
             raise NotFound("Conversation not found")
 
-        if self.request.user not in conversation.participants.all():
-            raise PermissionDenied("You are not a participant in this conversation")
+        if not conversation.participants.filter(id=self.request.user.id).exists():
+            raise PermissionDenied(
+                "You are not a participant in this conversation",
+                code=status.HTTP_403_FORBIDDEN,
+            )
 
         # Return messages for this conversation with optimized queries
         return (
@@ -166,8 +181,11 @@ class MessageViewSet(viewsets.ModelViewSet):
         except Conversation.DoesNotExist:
             raise NotFound("Conversation not found")
 
-        if request.user not in conversation.participants.all():
-            raise PermissionDenied("You are not a participant in this conversation")
+        if not conversation.participants.filter(id=request.user.id).exists():
+            raise PermissionDenied(
+                "You are not a participant in this conversation",
+                code=status.HTTP_403_FORBIDDEN,
+            )
 
         # Create message with current user as sender
         serializer = self.get_serializer(data=request.data)
@@ -175,3 +193,31 @@ class MessageViewSet(viewsets.ModelViewSet):
         message = serializer.save(sender=request.user, conversation=conversation)
 
         return Response(MessageSerializer(message).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+
+        # Check if user is the message owner
+        if instance.sender != request.user:
+            raise PermissionDenied(
+                "You can only edit your own messages", code=status.HTTP_403_FORBIDDEN
+            )
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        # Check if user is the message owner
+        if instance.sender != request.user:
+            raise PermissionDenied(
+                "You can only delete your own messages", code=status.HTTP_403_FORBIDDEN
+            )
+
+        self.perform_destroy(instance)
+        return Response(status=status.HTTP_204_NO_CONTENT)
