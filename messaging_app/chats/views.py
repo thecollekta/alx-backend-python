@@ -2,18 +2,69 @@
 
 """Viewsets for Conversation and Message models"""
 
-from django.db.models import QuerySet
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.response import Response
+from rest_framework_simplejwt.views import TokenObtainPairView
 
-from .models import Conversation, Message
+from .models import Conversation, Message, User
+from .permissions import IsParticipant
 from .serializers import (
     ConversationDetailSerializer,
     ConversationListSerializer,
+    CustomTokenObtainPairSerializer,
     MessageSerializer,
+    UserSerializer,
 )
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Custom token obtain view that includes user data in the response
+    """
+
+    serializer_class = CustomTokenObtainPairSerializer
+
+
+class UserViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for viewing and editing user accounts.
+    """
+
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["get", "post", "patch", "head", "options"]  # Remove delete
+
+    def get_permissions(self):
+        """
+        Instantiates and returns the list of permissions that this view requires.
+        """
+        if self.action == "create":
+            permission_classes = [permissions.AllowAny]
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+        return [permission() for permission in permission_classes]
+
+    def get_queryset(self):
+        """
+        Filter to only show the current user's profile in list view
+        Non-staff users can only see their own profile
+        """
+        user = self.request.user
+        if user.is_staff:
+            return User.objects.all()
+        return User.objects.filter(pk=user.pk)
+
+    @action(detail=False, methods=["get"])
+    def me(self, request):
+        """
+        Retrieve the current user's profile
+        """
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
@@ -21,7 +72,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
     ViewSet for listing and creating conversations
     """
 
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsParticipant]
     http_method_names = ["get", "post", "head", "options"]  # Disable PUT/PATCH/DELETE
     filter_backends = [
         DjangoFilterBackend,
@@ -42,7 +93,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
             participants=self.request.user
         ).prefetch_related("participants", "messages")
 
-    def get_serializer_class(self):
+    def get_serializer_class(self) -> type:
         if self.action == "list":
             return ConversationListSerializer
         return ConversationDetailSerializer
@@ -69,7 +120,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsParticipant]
     http_method_names = ["get", "post", "head", "options"]  # Disable PUT/PATCH/DELETE
     filter_backends = [
         DjangoFilterBackend,
@@ -81,7 +132,7 @@ class MessageViewSet(viewsets.ModelViewSet):
     ordering = ["-sent_at"]
     search_fields = ["message_body", "sender__first_name", "sender__last_name"]
 
-    def get_queryset(self) -> "QuerySet[Message]":
+    def get_queryset(self):
         # Get conversation ID from URL
         conversation_id = self.kwargs.get("conversation_id")
 

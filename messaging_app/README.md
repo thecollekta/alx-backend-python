@@ -40,13 +40,19 @@
       SECRET_KEY=your_django_secret_key
       DEBUG=True
       ALLOWED_HOSTS=localhost,127.0.0.1
+      DB_NAME=your_db_name
+      DB_USER=your_db_user
+      DB_PASSWORD=your_db_password
+      DB_HOST=localhost
+      DB_PORT=5432
    ```
 
 ## Dependencies
 
 * Django 5.2.4+
-* Django REST Framework
+* Django REST Framework 3.16.0+
 * Python 3.12+
+* djangorestframework-simplejwt (JWT Authentication)
 * django-environ (for environment variables)
 * django-filter (for API filtering)
 * drf-nested-routers (for nested routes)
@@ -62,11 +68,13 @@ messaging_app/
 | ├ __init.py__.py
 | ├ admin.py         # Admin panel config
 | ├ apps.py
+| ├ auth.py          # JWT Authentication settings
 | ├ models.py        # Data models
+| ├ permissions.py   # Custom permissions
 | ├ serializers.py   # API serializers
 | ├ tests.py
 | ├ urls.py          # API endpoints
-| ├ views.py
+| ├ views.py         # View logic
 ├ messaging_app/     # Project config
 | ├ __init__.py
 | ├ asgi.py
@@ -110,11 +118,17 @@ messaging_app/
 * Automatic sent timestamp
 * UUID primary key
 
-## Endpoints (Development)
+## API Endpoints
 
 All endpoints are prefixed with `/api/v1/`
 
 ### Authentication
+
+| Endpoint         | Method | Description                              |
+|------------------|--------|------------------------------------------|
+| `/token/`        | POST   | Obtain JWT token (access + refresh)      |
+| `/token/refresh/`| POST   | Get new access token using refresh token |
+| `/token/verify/` | POST   | Verify a token                           |
 
 * Use DRF's session authentication or token authentication
 * Login via browseable API: `/api-auth/login/`
@@ -122,6 +136,13 @@ All endpoints are prefixed with `/api/v1/`
 ### Users
 
 * Admin Interface: `/admin/` to manage users, conversations, and messages
+
+| Endpoint       | Method | Description                | Permissions        |
+|----------------|--------|----------------------------|--------------------|
+| `/users/`      | POST   | Register new user          | AllowAny           |
+| `/users/me/`   | GET    | Get current user's profile | IsAuthenticated    |
+| `/users/{id}/` | GET    | Get user details           | IsOwner or IsStaff |
+| `/users/{id}/` | PATCH  | Update user details        | IsOwner or IsStaff |
 
 ### Conversations
 
@@ -162,7 +183,31 @@ All endpoints are prefixed with `/api/v1/`
 
 ### Example Requests
 
-**Create Conversation**:
+#### User Registration
+
+```bash
+POST /api/v1/users/
+{
+  "username": "Collekta",
+  "email": "admin@msgapp.com",   # Use your preferred email with domain
+  "first_name": "Festus",
+  "last_name": "Aboagye",
+  "password": "AdminP@ss123",  
+  "role": "admin" # host, guest options available. admin should not be exposed for user registration
+}
+```
+
+#### User Login
+
+```bash
+POST /api/v1/token/
+{
+  "username": "Collekta",
+  "password": "AdminP@ss123"
+}
+```
+
+#### Create Conversation
 
 ```bash
 POST /api/v1/conversations/
@@ -171,7 +216,7 @@ POST /api/v1/conversations/
 }
 ```
 
-**Send Message**:
+#### Send Message
 
 ```bash
 POST /api/v1/conversations/{conversation_id}/messages/
@@ -180,14 +225,41 @@ POST /api/v1/conversations/{conversation_id}/messages/
 }
 ```
 
-**List Conversations**:
+#### List Conversations
 
 ```bash
 GET /api/v1/conversations/
 ```
 
-***List Messages in Conversation***:
+#### List Messages in Conversation
 
 ```bash
 GET /api/v1/conversations/{conversation_id}/messages/
 ```
+
+## Security Considerations
+
+* Always use HTTPS in production
+* Tokens expire after 1 hour (configurable in settings)
+* Refresh tokens expire after 1 day
+* Passwords are hashed before storage
+* Rate limiting is recommended for authentication endpoints
+
+## Development
+
+### Running Tests
+
+```bash
+python manage.py test
+```
+
+### Creating Migrations
+
+```bash
+python manage.py makemigrations
+python manage.py migrate
+```
+
+### Admin Interface
+
+Access the admin interface at `/admin/` using your superuser credentials.

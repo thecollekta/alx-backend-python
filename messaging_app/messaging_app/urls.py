@@ -22,6 +22,7 @@ from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    # API URLs
     path("api/v1/", include("chats.urls")),
-    path('api-auth/', include('rest_framework.urls')),  # DRF auth for browseable API
+    path("api-auth/", include("rest_framework.urls")),  # DRF auth for browseable API
 ]
