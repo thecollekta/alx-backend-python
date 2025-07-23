@@ -6,25 +6,15 @@
 2. Activate the environment:
 
    ```bash
-   source .venv/scripts/activate # Windows
-   source .venv/bin/activate # MacOS
+   source .venv/scripts/activate  # Windows
+   source .venv/bin/activate     # MacOS/Linux
    ```
 
 3. Install dependencies: `pip install -r requirements.txt`
 4. Apply migrations: `python manage.py migrate`
-5. Create superuser: `python manage.py createsuperuser`
-   * Follow the prompts to create admin account:
-
-      ```bash
-      python manage.py createsuperuser
-      Email: <admin@example.com>
-      First name: Admin
-      Last name: User
-      Password: ********
-      Password (again): ********
-      ```
-
-6. Start development server: `python manage.py runserver`
+5. Create test data: `python manage.py create_test_data`
+6. Create admin user: `python manage.py createsuperuser`
+7. Start development server: `python manage.py runserver`
 
 ## Environment Configuration
 
@@ -37,205 +27,191 @@
 2. Set required values:
 
    ```env
-      SECRET_KEY=your_django_secret_key
-      DEBUG=True
-      ALLOWED_HOSTS=localhost,127.0.0.1
-      DB_NAME=your_db_name
-      DB_USER=your_db_user
-      DB_PASSWORD=your_db_password
-      DB_HOST=localhost
-      DB_PORT=5432
+   SECRET_KEY=your_django_secret_key
+   DEBUG=True
+   ALLOWED_HOSTS=localhost,127.0.0.1
+   DB_NAME=your_db_name
+   DB_USER=your_db_user
+   DB_PASSWORD=your_db_password
+   DB_HOST=localhost
+   DB_PORT=5432
    ```
 
 ## Dependencies
 
 * Django 5.2.4+
-* Django REST Framework 3.16.0+
-* Python 3.12+
+* Django REST Framework 3.14.0+
 * djangorestframework-simplejwt (JWT Authentication)
 * django-environ (for environment variables)
 * django-filter (for API filtering)
-* drf-nested-routers (for nested routes)
-* psycopg (PostgreSQL adapter)
+* psycopg2-binary (PostgreSQL adapter)
+* python-dotenv (for local development)
 
 ## Project Structure
 
 ```text
 messaging_app/
-├ .venv/             # Virtual environment
-├ chats/             # Messaging app
-| ├ migrations       # Database migrations
-| ├ __init.py__.py
-| ├ admin.py         # Admin panel config
-| ├ apps.py
-| ├ auth.py          # JWT Authentication settings
-| ├ models.py        # Data models
-| ├ permissions.py   # Custom permissions
-| ├ serializers.py   # API serializers
-| ├ tests.py
-| ├ urls.py          # API endpoints
-| ├ views.py         # View logic
-├ messaging_app/     # Project config
-| ├ __init__.py
-| ├ asgi.py
-| ├ settings.py
-| ├ urls.py          # Main URL routing
-| ├ wsgi.py
-| ├ .env.example     # Environment variable template
-├ .gitignore
-├ manage.py
-├ README.md          # Project documentation
-├ requirements.txt   # Dependencies file
+├── .venv/             # Virtual environment
+├── chats/             # Messaging app
+│   ├── migrations/    # Database migrations
+│   ├── management/    # Custom management commands
+│   ├── __init__.py
+│   ├── admin.py       # Admin panel config
+│   ├── apps.py
+│   ├── models.py      # Data models
+│   ├── permissions.py # Custom permissions
+│   ├── serializers.py # API serializers
+│   ├── urls.py       # API endpoints
+│   └── views.py      # View logic
+├── messaging_app/     # Project config
+│   ├── __init__.py
+│   ├── asgi.py
+│   ├── settings.py   # Django settings
+│   ├── urls.py      # Main URL routing
+│   └── wsgi.py
+├── .env.example     # Environment variable template
+├── .gitignore
+├── manage.py
+├── README.md        # Project documentation
+└── requirements.txt # Dependencies file
 ```
 
-## Key Implementations
+## Authentication
 
-### Custom User Model
+The API uses JWT (JSON Web Tokens) for authentication.
 
-* Extended Django's AbstractUser with additional fields
-* Email-based authentication (no username)
-* UUID primary key instead of integer ID
-* Role-based permissions (guest, host, admin)
-* Fields:
-  * first_name (required)
-  * last_name (required)
-  * email (unique, required)
-  * phone_number (optional)
-  * role (required, with choices)
-  * created_at (auto timestamp)
+### Obtaining Tokens
 
-### Conversation Model
+1. **Get Access Token**:
 
-* Many-to-Many relationship with Users
-* UUID primary key
-* Automatic creation timestamp
-* Represents a messaging thread between multiple users
+   ```bash
+   POST /api/v1/token/
+   {
+     "username": "your_username",
+     "password": "your_password"
+   }
+   ```
 
-### Message Model
+2. **Using the Token**:
+   Include the token in the Authorization header:
 
-* ForeignKey relationship with Sender (User) and Conversation
-* Text message body (required)
-* Automatic sent timestamp
-* UUID primary key
+   ```bash
+   Authorization: Bearer your_token_here
+   ```
+
+3. **Refresh Token**:
+
+   ```bash
+   POST /api/v1/token/refresh/
+   {
+     "refresh": "your_refresh_token_here"
+   }
+   ```
+
+## Permissions
+
+* **IsAuthenticated**: Required for all API endpoints
+* **IsParticipantOfConversation**: Users must be participants to view/modify conversations
+* **IsMessageOwnerOrReadOnly**: Only message owners can edit/delete their messages
+* **IsAdminUser**: Required for admin interface access
 
 ## API Endpoints
 
-All endpoints are prefixed with `/api/v1/`
+### Token Authentication
 
-### Authentication
-
-| Endpoint         | Method | Description                              |
-|------------------|--------|------------------------------------------|
-| `/token/`        | POST   | Obtain JWT token (access + refresh)      |
-| `/token/refresh/`| POST   | Get new access token using refresh token |
-| `/token/verify/` | POST   | Verify a token                           |
-
-* Use DRF's session authentication or token authentication
-* Login via browseable API: `/api-auth/login/`
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/token/` | POST | Obtain JWT token (access + refresh) |
+| `/token/refresh/` | POST | Get new access token using refresh token |
+| `/token/verify/` | POST | Verify a token |
 
 ### Users
 
-* Admin Interface: `/admin/` to manage users, conversations, and messages
-
-| Endpoint       | Method | Description                | Permissions        |
-|----------------|--------|----------------------------|--------------------|
-| `/users/`      | POST   | Register new user          | AllowAny           |
-| `/users/me/`   | GET    | Get current user's profile | IsAuthenticated    |
-| `/users/{id}/` | GET    | Get user details           | IsOwner or IsStaff |
-| `/users/{id}/` | PATCH  | Update user details        | IsOwner or IsStaff |
+| Endpoint | Method | Description | Permissions |
+|----------|--------|-------------|-------------|
+| `/users/` | POST | Register new user | AllowAny |
+| `/users/me/` | GET | Get current user's profile | IsAuthenticated |
+| `/users/{id}/` | GET | Get user details | IsOwner or IsStaff |
+| `/users/{id}/` | PATCH | Update user details | IsOwner or IsStaff |
 
 ### Conversations
 
-|Endpoint        |Method     |Description| Permissions|
-|----------------|-----------|-----------|------------|
-| `/conversations/` |GET |List all conversations where current user is a participant |Authenticated|
-| `/conversations/` |POST| Create new conversation (auto-adds current user) |Authenticated|
-| `/conversations/{conversation_id}/` |GET |Retrieve conversation details with messages |Participant only|
-| `/conversations/{conversation_id}/messages/`| GET |List all messages in conversation |Participant only|
-| `/conversations/{conversation_id}/messages/`| POST| Create new message in conversation |Participant only|
+| Endpoint | Method | Description | Permissions |
+|----------|--------|-------------|-------------|
+| `/conversations/` | GET | List user's conversations | IsAuthenticated |
+| `/conversations/` | POST | Create new conversation | IsAuthenticated |
+| `/conversations/{id}/` | GET | Get conversation details | IsParticipant |
+| `/conversations/{id}/messages/` | GET | List messages | IsParticipant |
+| `/conversations/{id}/messages/` | POST | Send new message | IsParticipant |
 
-**Filters**:
+## Test Data
 
-* Ordering: `?ordering=created_at` (or `-created_at` for descending)
-* Search: `?search=term` (searches participant names/emails)
+Pre-created test users:
 
-### Messages
+1. **Kwame Mensah**
+   * Username: `kwame`
+   * Password: `testpass123`
 
-|Endpoint        |Method     |Description| Permissions|
-|----------------|-----------|-----------|------------|
-| `/conversations/{conversation_id}/messages/` |GET |List all messages in conversation |Participant only|
-| `/conversations/{conversation_id}/messages/` |POST |Send new message |Participant only|
-| `/conversations/{conversation_id}/messages/{message_id}/` |GET |Retrieve specific message |Participant only|
+2. **Ama Agyei**
+   * Username: `ama`
+   * Password: `testpass123`
 
-**Filters**:
+3. **Kofi Asante**
+   * Username: `kofi`
+   * Password: `testpass123`
 
-* Filter by sender role: ?sender__role=host
-* Ordering: ?ordering=sent_at (or -sent_at for descending)
-* Search: ?search=term (searches message body or sender names)
+**Note**: Kwame and Ama share a conversation with test messages in Twi.
 
-### Admin Panel Features
+## Testing Permissions
 
-* Custom User management interface
-* Conversation view with inline messages
-* Message list with search and filters
-* Role-based user management
-* Relationship visualization
-
-### Example Requests
-
-#### User Registration
+### 1. Unauthenticated Access (401)
 
 ```bash
-POST /api/v1/users/
-{
-  "username": "Collekta",
-  "email": "admin@msgapp.com",   # Use your preferred email with domain
-  "first_name": "Festus",
-  "last_name": "Aboagye",
-  "password": "AdminP@ss123",  
-  "role": "admin" # host, guest options available. admin should not be exposed for user registration
-}
+curl -X GET http://127.0.0.1:8000/api/v1/conversations/
+# Should return 401 Unauthorized
 ```
 
-#### User Login
+### 2. Non-Participant Access (403)
 
 ```bash
-POST /api/v1/token/
-{
-  "username": "Collekta",
-  "password": "AdminP@ss123"
-}
+# Get Kofi's token
+TOKEN=$(curl -X POST http://127.0.0.1:8000/api/v1/token/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "kofi", "password": "testpass123"}' | jq -r '.access')
+
+# Try to access Kwame and Ama's conversation
+curl -H "Authorization: Bearer $TOKEN" \
+  http://127.0.0.1:8000/api/v1/conversations/1/
+# Should return 403 Forbidden
 ```
 
-#### Create Conversation
+### 3. Message Operations
 
 ```bash
-POST /api/v1/conversations/
-{
-    "participant_ids": ["user-uuid-1", "user-uuid-2"]
-}
+# Get Kwame's token
+TOKEN=$(curl -X POST http://127.0.0.1:8000/api/v1/token/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "kwame", "password": "testpass123"}' | jq -r '.access')
+
+# Try to edit Ama's message (should fail)
+curl -X PATCH http://127.0.0.1:8000/api/v1/conversations/1/messages/2/ \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"message_body": "Edited message"}'
+# Should return 403 Forbidden
 ```
 
-#### Send Message
+## Admin Interface
 
-```bash
-POST /api/v1/conversations/{conversation_id}/messages/
-{
-    "message_body": "Hello there!"
-}
-```
+Access the admin interface at `http://127.0.0.1:8000/admin/` using admin credentials.
 
-#### List Conversations
+### Admin Features
 
-```bash
-GET /api/v1/conversations/
-```
+* User management (create, edit, delete users)
 
-#### List Messages in Conversation
-
-```bash
-GET /api/v1/conversations/{conversation_id}/messages/
-```
+* View all conversations
+* Monitor messages
+* User role management
 
 ## Security Considerations
 
@@ -243,15 +219,10 @@ GET /api/v1/conversations/{conversation_id}/messages/
 * Tokens expire after 1 hour (configurable in settings)
 * Refresh tokens expire after 1 day
 * Passwords are hashed before storage
-* Rate limiting is recommended for authentication endpoints
+* Admin interface is protected by `IsAdminUser`
+* Rate limiting recommended for authentication endpoints
 
 ## Development
-
-### Running Tests
-
-```bash
-python manage.py test
-```
 
 ### Creating Migrations
 
@@ -260,6 +231,19 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-### Admin Interface
+### Running Tests
 
-Access the admin interface at `/admin/` using your superuser credentials.
+```bash
+python manage.py test
+```
+
+### Creating Admin User
+
+```bash
+python manage.py createsuperuser
+# Follow the prompts to create admin credentials
+```
+
+## License
+
+This project is licensed under the ALX ProDEV Curriculum.

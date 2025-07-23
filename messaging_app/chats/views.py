@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import Conversation, Message, User
-from .permissions import IsParticipant
+from .permissions import IsMessageOwnerOrReadOnly, IsParticipantOfConversation
 from .serializers import (
     ConversationDetailSerializer,
     ConversationListSerializer,
@@ -72,7 +72,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
     ViewSet for listing and creating conversations
     """
 
-    permission_classes = [permissions.IsAuthenticated, IsParticipant]
+    permission_classes = [permissions.IsAuthenticated, IsParticipantOfConversation]
     http_method_names = ["get", "post", "head", "options"]  # Disable PUT/PATCH/DELETE
     filter_backends = [
         DjangoFilterBackend,
@@ -120,7 +120,11 @@ class MessageViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = MessageSerializer
-    permission_classes = [permissions.IsAuthenticated, IsParticipant]
+    permission_classes = [
+        permissions.IsAuthenticated,
+        IsParticipantOfConversation,
+        IsMessageOwnerOrReadOnly,
+    ]
     http_method_names = ["get", "post", "head", "options"]  # Disable PUT/PATCH/DELETE
     filter_backends = [
         DjangoFilterBackend,

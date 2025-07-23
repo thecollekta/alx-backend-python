@@ -5,30 +5,32 @@ Admin registration for chats app models: User, Conversation, Message
 """
 
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
+from rest_framework.permissions import IsAdminUser
 
-from .models import Conversation, Message, User
+from .models import Conversation, Message
+
+User = get_user_model()
 
 
 # Custom User Admin configuration
 class CustomUserAdmin(UserAdmin):
     """Custom User model display in admin"""
 
-    # Fields to display in the admin list view
-    list_display = ("email", "first_name", "last_name", "role", "is_active", "is_staff")
-
-    # Fields available for filtering
-    list_filter = ("role", "is_active", "is_staff")
-
-    # Fieldsets for the edit view
+    model = User
+    list_display = ("username", "email", "first_name", "last_name", "role", "is_staff")
+    list_filter = ("is_staff", "is_superuser", "role")
     fieldsets = (
-        (None, {"fields": ("email", "password")}),
-        ("Personal Info", {"fields": ("first_name", "last_name", "phone_number")}),
+        (None, {"fields": ("username", "password")}),
+        (
+            "Personal info",
+            {"fields": ("first_name", "last_name", "email", "phone_number", "role")},
+        ),
         (
             "Permissions",
             {
                 "fields": (
-                    "role",
                     "is_active",
                     "is_staff",
                     "is_superuser",
@@ -37,55 +39,43 @@ class CustomUserAdmin(UserAdmin):
                 )
             },
         ),
-        ("Important Dates", {"fields": ("last_login", "date_joined")}),
+        ("Important dates", {"fields": ("last_login", "date_joined")}),
     )
-
-    # Fields when adding a new user
     add_fieldsets = (
         (
             None,
             {
                 "classes": ("wide",),
-                "fields": (
-                    "email",
-                    "first_name",
-                    "last_name",
-                    "role",
-                    "password1",
-                    "password2",
-                ),
+                "fields": ("username", "email", "password1", "password2", "role"),
             },
         ),
     )
-
-    # Default ordering
-    ordering = ("email",)
     search_fields = ("email", "first_name", "last_name")
+    ordering = ("email",)
+    filter_horizontal = (
+        "groups",
+        "user_permissions",
+    )
+
+    def has_module_permission(self, request):
+        return IsAdminUser().has_permission(request, self)
 
 
-# Register Conversation with inline for messages
-class MessageInline(admin.TabularInline):
-    model = Message
-    extra = 0  # No extra blank forms
-    fields = ("sender", "message_body", "sent_at")
-    readonly_fields = ("sent_at",)
-
-
-@admin.register(Conversation)
+# Custom Conversation configuration
 class ConversationAdmin(admin.ModelAdmin):
     """Admin view for Conversation model"""
 
     list_display = ("conversation_id", "created_at", "participants_list")
-    filter_horizontal = ("participants",)  # Better widget for many-to-many
-    inlines = [MessageInline]
+    filter_horizontal = ("participants",)
 
-    @admin.display(description="Participants")
     def participants_list(self, obj):
-        return ", ".join([user.email for user in obj.participants.all()])
+        return ", ".join([user.username for user in obj.participants.all()])
+
+    def has_module_permission(self, request):
+        return IsAdminUser().has_permission(request, self)
 
 
-# Register Message model
-@admin.register(Message)
+# Custom Message configuration
 class MessageAdmin(admin.ModelAdmin):
     """Admin view for Message model"""
 
@@ -97,7 +87,7 @@ class MessageAdmin(admin.ModelAdmin):
         "short_message_body",
     )
     list_filter = ("sender", "conversation")
-    search_fields = ("message_body", "sender__email")
+    search_fields = ("message_body", "sender__username")
     date_hierarchy = "sent_at"
 
     @admin.display(description="Message")
@@ -108,6 +98,11 @@ class MessageAdmin(admin.ModelAdmin):
             else obj.message_body
         )
 
+    def has_module_permission(self, request):
+        return IsAdminUser().has_permission(request, self)
 
-# Register the custom User model
+
+# Register models with admin site
 admin.site.register(User, CustomUserAdmin)
+admin.site.register(Conversation, ConversationAdmin)
+admin.site.register(Message, MessageAdmin)
