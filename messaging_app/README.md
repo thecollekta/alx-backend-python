@@ -144,6 +144,95 @@ The API uses JWT (JSON Web Tokens) for authentication.
 | `/conversations/{id}/messages/` | GET | List messages | IsParticipant |
 | `/conversations/{id}/messages/` | POST | Send new message | IsParticipant |
 
+### Messages
+
+#### List Messages in a Conversation
+
+```http
+GET /api/v1/conversations/{conversation_id}/messages/
+```
+
+**Pagination**:
+
+* Returns 20 messages per page by default
+* Use `page` parameter to navigate through pages
+* Customize page size with `page_size` parameter (max 100)
+
+**Filtering**:
+
+* `sender`: Filter by sender ID or username
+* `start_date`: Filter messages sent after this date (YYYY-MM-DD HH:MM:SS)
+* `end_date`: Filter messages sent before this date (YYYY-MM-DD HH:MM:SS)
+* `search`: Search in message content (case-insensitive)
+
+**Sorting**:
+
+* Use `ordering` parameter with:
+  * `sent_at` (ascending)
+  * `-sent_at` (descending, default)
+  * `sender__username` (alphabetical by sender)
+  * `-sender__username` (reverse alphabetical by sender)
+
+**Example Request**:
+
+```bash
+# Get first page of messages from conversation 1, ordered by most recent
+GET /api/v1/conversations/{conversation_id}/messages/
+
+# Get second page with 10 messages per page
+GET /api/v1/conversations/{conversation_id}/messages/?page=2&page_size=10
+
+# Filter messages from a specific sender
+GET /api/v1/conversations/{conversation_id}/messages/?sender=kwame
+
+# Search for messages containing "hello"
+GET /api/v1/conversations/{conversation_id}/messages/?search=hello
+
+# Get messages from a date range
+GET /api/v1/conversations/{conversation_id}/messages/?start_date=2025-07-01&end_date=2025-07-23
+
+# Combine filters
+GET /api/v1/conversations/{conversation_id}/messages/?sender=kwame&start_date=2025-07-01&search=hello
+```
+
+**Example Response**:
+
+```json
+{
+  "links": {
+    "next": "http://api.example.org/conversations/{conversation_id}/messages/?page=2",
+    "previous": null
+  },
+  "count": 42,
+  "total_pages": 3,
+  "current_page": 1,
+  "results": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "message_body": "Hello, how are you?",
+      "sent_at": "2025-07-01T12:00:00Z",
+      "sender": {
+        "id": 1,
+        "username": "kwame",
+        "first_name": "Kwame",
+        "last_name": "Mensah"
+      }
+    },
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440001",
+      "message_body": "I'm doing well, thanks!",
+      "sent_at": "2025-07-01T12:05:00Z",
+      "sender": {
+        "id": 2,
+        "username": "ama",
+        "first_name": "Ama",
+        "last_name": "Agyei"
+      }
+    }
+  ]
+}
+```
+
 ## Test Data
 
 Pre-created test users:
@@ -194,7 +283,7 @@ TOKEN=$(curl -X POST http://127.0.0.1:8000/api/v1/token/ \
   -d '{"username": "kwame", "password": "testpass123"}' | jq -r '.access')
 
 # Try to edit Ama's message (should fail)
-curl -X PATCH http://127.0.0.1:8000/api/v1/conversations/1/messages/2/ \
+curl -X PATCH http://127.0.0.1:8000/api/v1/conversations/{conversation_id}/messages/2/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"message_body": "Edited message"}'

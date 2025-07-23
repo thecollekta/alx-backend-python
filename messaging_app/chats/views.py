@@ -9,7 +9,9 @@ from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 
+from .filters import MessageFilter
 from .models import Conversation, Message, User
+from .pagination import MessagePagination
 from .permissions import IsMessageOwnerOrReadOnly, IsParticipantOfConversation
 from .serializers import (
     ConversationDetailSerializer,
@@ -143,10 +145,16 @@ class MessageViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter,
         filters.SearchFilter,
     ]
-    filterset_fields = ["sender__role"]
-    ordering_fields = ["sent_at"]
+    filterset_class = MessageFilter
+    pagination_class = MessagePagination
+    ordering_fields = ["sent_at", "sender__username"]
     ordering = ["-sent_at"]
-    search_fields = ["message_body", "sender__first_name", "sender__last_name"]
+    search_fields = [
+        "message_body",
+        "sender__first_name",
+        "sender__last_name",
+        "sender__username",
+    ]
 
     def get_queryset(self):
         # Get conversation ID from URL
@@ -154,22 +162,24 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         # Verify conversation exists and user is participant
         try:
-            conversation = Conversation.objects.get(id=conversation_id)
+            conversation = Conversation.objects.get(conversation_id=conversation_id)
         except Conversation.DoesNotExist:
             raise NotFound("Conversation not found")
 
-        if not conversation.participants.filter(id=self.request.user.id).exists():
+        if not conversation.participants.filter(pk=self.request.user.pk).exists():
             raise PermissionDenied(
                 "You are not a participant in this conversation",
                 code=status.HTTP_403_FORBIDDEN,
             )
 
         # Return messages for this conversation with optimized queries
-        return (
-            Message.objects.filter(conversation=conversation)
-            .select_related("sender", "conversation")
-            .order_by("-sent_at")
-        )
+        queryset = Message.objects.filter(conversation=conversation)
+
+        # Apply additional filtering
+        queryset = self.filter_queryset(queryset)
+
+        # Return with related data
+        return queryset.select_related("sender", "conversation").order_by("-sent_at")
 
     def create(self, request, *args, **kwargs):
         # Get conversation ID from URL
