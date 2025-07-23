@@ -233,6 +233,176 @@ GET /api/v1/conversations/{conversation_id}/messages/?sender=kwame&start_date=20
 }
 ```
 
+## API Documentation
+
+### 1. Message API Overview
+
+The Message API provides endpoints for managing conversations and messages with features like authentication, pagination, filtering, and permission controls. It uses JWT for authentication and follows RESTful principles.
+
+### 2. Authentication Tests
+
+#### 2.1 Get JWT Token
+
+**Description**:
+This endpoint authenticates users and returns JWT tokens for accessing protected endpoints. The access token should be included in the `Authorization` header for subsequent requests.
+
+**Endpoint**: `POST /api/v1/token/`
+
+**Request Body**:
+
+```json
+{
+    "username": "string",
+    "password": "string"
+}
+```
+
+**Response**:
+
+* 200 OK: Returns access and refresh tokens
+* 401 Unauthorized: Invalid credentials
+
+**Usage**:
+
+* First step in the authentication flow
+* Tokens expire after 1 hour (configurable)
+* Use refresh token to get new access tokens
+
+### 3. Conversation Tests
+
+#### 3.1 Create a New Conversation
+
+**Description**:
+Creates a new conversation between the authenticated user and specified participants. The creator is automatically added as a participant.
+
+**Endpoint**: `POST /api/v1/conversations/`
+
+**Headers**:
+
+* `Authorization: Bearer <token>`
+* `Content-Type: application/json`
+
+**Request Body**:
+
+```json
+{
+    "participants": [2, 3]
+}
+```
+
+**Response**:
+
+* 201 Created: Returns the created conversation
+* 400 Bad Request: Invalid participant data
+* 401 Unauthorized: Missing or invalid token
+
+### 4. Message Tests
+
+#### 4.1 Send a Message
+
+**Description**:
+Sends a new message to a specified conversation. The sender is automatically set to the authenticated user.
+
+**Endpoint**: `POST /api/v1/conversations/{conversation_id}/messages/`
+
+**Headers**:
+
+* `Authorization: Bearer <token>`
+* `Content-Type: application/json`
+
+**Request Body**:
+
+```json
+{
+    "message_body": "Your message here"
+}
+```
+
+**Response**:
+
+* 201 Created: Returns the created message
+* 403 Forbidden: User is not a participant in the conversation
+* 404 Not Found: Conversation does not exist
+
+#### 4.2 List Messages with Pagination
+
+**Description**:
+Retrieves messages from a conversation with pagination support. Returns 20 messages per page by default.
+
+**Endpoint**: `GET /api/v1/conversations/{conversation_id}/messages/`
+
+**Query Parameters**:
+
+* `page`: Page number (default: 1)
+* `page_size`: Number of messages per page (default: 20, max: 100)
+
+**Response**:
+
+* 200 OK: Returns paginated list of messages
+* 403 Forbidden: User is not a participant
+* 404 Not Found: Conversation does not exist
+
+### 5. Permission Tests
+
+#### 5.1 Test Unauthorized Access
+
+**Description**:
+Verifies that protected endpoints reject requests without valid authentication.
+
+**Test Cases**:
+
+* Access any protected endpoint without token
+* Expected: 401 Unauthorized
+* Purpose: Ensures security of protected resources
+
+#### 5.2 Test Access to Other User's Conversation
+
+**Description**:
+Verifies that users can only access conversations they participate in.
+
+**Test Flow**:
+
+1. User A creates a conversation
+2. User B attempts to access User A's conversation
+3. Expected: 403 Forbidden
+
+**Purpose**:
+
+* Validates conversation privacy
+* Ensures proper access control implementation
+
+### 6. Filtering
+
+#### 6.1 Filter Messages by Date Range
+
+**Description**:
+Retrieves messages sent within a specific date range.
+
+**Endpoint**: `GET /api/v1/conversations/{conversation_id}/messages/`
+
+**Query Parameters**:
+
+* `start_date`: Messages sent after this datetime (ISO 8601 format)
+* `end_date`: Messages sent before this datetime (ISO 8601 format)
+
+**Example**:
+
+```text
+GET /api/v1/conversations/1/messages/?start_date=2023-01-01T00:00:00Z&end_date=2023-12-31T23:59:59Z
+```
+
+**Response**:
+
+* 200 OK: Returns filtered messages
+* 400 Bad Request: Invalid date format
+* 403 Forbidden: User is not a participant
+
+**Usage**:
+
+* Useful for retrieving messages from a specific time period
+* Supports timezone-aware datetime strings
+* Can be combined with other filters and pagination
+
 ## Test Data
 
 Pre-created test users:
