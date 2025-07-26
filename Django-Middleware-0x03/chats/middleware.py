@@ -1,9 +1,10 @@
 # chats/middleware.py
 
 import logging
-from datetime import datetime, time
+from collections import defaultdict
+from datetime import datetime, time, timedelta
 
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 
 # Configure the logger
@@ -72,5 +73,59 @@ class RestrictAccessByTimeMiddleware:
                 "Access to the chat is restricted between 9:00 PM and 6:00 AM. "
                 "Please try again during working hours."
             )
+
+        return self.get_response(request)
+
+
+class OffensiveLanguageMiddleware:
+    """
+    Middleware to limit the number of chat messages per IP address.
+    Implements a rate limit of 5 messages per minute per IP.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        # Dictionary to store IP addresses and their request timestamps
+        self.requests = defaultdict(list)
+        # Rate limit configuration
+        self.RATE_LIMIT = 5  # Max 5 requests
+        self.TIME_WINDOW = 60  # 1 minute in seconds
+
+    def __call__(self, request):
+        # Only apply rate limiting to POST requests to message endpoints
+        if request.method == "POST" and "messages" in request.path:
+            # Get client IP address
+            x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+            if x_forwarded_for:
+                ip = x_forwarded_for.split(",")[0]
+            else:
+                ip = request.META.get("REMOTE_ADDR")
+
+            current_time = datetime.now()
+
+            # Clean up old requests outside the time window
+            self.requests[ip] = [
+                t
+                for t in self.requests[ip]
+                if current_time - t < timedelta(seconds=self.TIME_WINDOW)
+            ]
+
+            # Check if rate limit exceeded
+            if len(self.requests[ip]) >= self.RATE_LIMIT:
+                return JsonResponse(
+                    {
+                        "error": "Rate limit exceeded. Please try again later.",
+                        "status": "error",
+                        "code": 429,
+                    },
+                    status=429,
+                )
+
+            # Add current request timestamp
+            self.requests[ip].append(current_time)
+
+            # Log the rate limit status (optional)
+            remaining = self.RATE_LIMIT - len(self.requests[ip])
+            print(f"IP {ip}: {remaining} requests remaining in current window")
 
         return self.get_response(request)
