@@ -61,19 +61,71 @@ messaging_app/
 │   ├── models.py      # Data models
 │   ├── permissions.py # Custom permissions
 │   ├── serializers.py # API serializers
-│   ├── urls.py       # API endpoints
-│   └── views.py      # View logic
+│   ├── urls.py        # API endpoints
+│   └── views.py       # View logic
 ├── messaging_app/     # Project config
 │   ├── __init__.py
 │   ├── asgi.py
-│   ├── settings.py   # Django settings
-│   ├── urls.py      # Main URL routing
+│   ├── settings.py    # Django settings
+│   ├── urls.py        # Main URL routing
 │   └── wsgi.py
-├── .env.example     # Environment variable template
+├── .env.example       # Environment variable template
 ├── .gitignore
 ├── manage.py
-├── README.md        # Project documentation
-└── requirements.txt # Dependencies file
+├── README.md          # Project documentation
+├── requirements.txt   # Dependencies file
+└── settings.py        # Duplicated Django settings
+```
+
+{{ ... }}
+
+## Request Logging Middleware
+
+The application includes a custom middleware that logs all incoming requests to help with debugging and monitoring.
+
+### Features
+
+* Logs each request with timestamp, username, and request path
+* Automatically creates a `requests.log` file in the project root
+* Handles both authenticated and anonymous users
+* Logs are written in a human-readable format
+
+### Log Format
+
+Each log entry follows this format:
+
+```text
+YYYY-MM-DD HH:MM:SS.ssssss - User: [username] - Path: [request_path]
+```
+
+Example:
+
+```bash
+2025-07-26 14:37:49.123456 - User: admin - Path: /api/v1/conversations/
+2025-07-26 14:38:12.456789 - User: Anonymous - Path: /api/v1/users/
+2025-07-26 14:44:42.624159 - User: Anonymous - Path: /
+2025-07-26 14:44:45.422102 - User: Anonymous - Path: /favicon.ico
+2025-07-26 14:44:56.025656 - User: Anonymous - Path: /admin/
+2025-07-26 14:44:56.139008 - User: Anonymous - Path: /admin/login/
+```
+
+### Log File Location
+
+* Logs are stored in `requests.log` at the project root directory.
+
+* The file is automatically created when the first request is made.
+
+### Configuration
+
+The middleware is automatically enabled in `settings.py` and will start logging requests as soon as the server starts.
+
+### Viewing Logs
+
+To monitor logs in real-time, you can use:
+
+```bash
+tail -f requests.log  # Linux/Mac
+Get-Content -Path .\requests.log -Wait  # Windows PowerShell
 ```
 
 ## Authentication
