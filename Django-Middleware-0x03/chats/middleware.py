@@ -129,3 +129,60 @@ class OffensiveLanguageMiddleware:
             print(f"IP {ip}: {remaining} requests remaining in current window")
 
         return self.get_response(request)
+
+
+class RolePermissionMiddleware:
+    """
+    Middleware to enforce role-based access control.
+    Only allows admin or moderator roles to perform certain actions.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+        # Define protected paths and their required roles
+        self.protected_paths = {
+            "/api/v1/users/": ["admin"],  # User management
+            "/api/v1/conversations/": ["admin", "moderator"],  # Conversation management
+        }
+
+    def __call__(self, request):
+        # Only check for protected paths
+        if any(path in request.path for path in self.protected_paths):
+            # Skip for safe methods (GET, HEAD, OPTIONS)
+            if request.method not in ["GET", "HEAD", "OPTIONS"]:
+                # Check if user is authenticated
+                if not hasattr(request, "user") or not request.user.is_authenticated:
+                    return JsonResponse(
+                        {
+                            "error": "Authentication required",
+                            "status": "error",
+                            "code": 401,
+                        },
+                        status=401,
+                    )
+
+                # Get user's role
+                user_role = getattr(request.user, "role", None)
+
+                # Get required roles for the current path
+                required_roles = next(
+                    (
+                        roles
+                        for path, roles in self.protected_paths.items()
+                        if path in request.path
+                    ),
+                    [],
+                )
+
+                # Check if user has required role
+                if user_role not in required_roles:
+                    return JsonResponse(
+                        {
+                            "error": "Insufficient permissions. Admin or moderator role required.",
+                            "status": "error",
+                            "code": 403,
+                        },
+                        status=403,
+                    )
+
+        return self.get_response(request)

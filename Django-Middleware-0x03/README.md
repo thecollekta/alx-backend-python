@@ -83,7 +83,7 @@ messaging_app/
 
 The application includes a custom middleware that logs all incoming requests to help with debugging and monitoring.
 
-### Features
+### Request Logging Features
 
 * Logs each request with timestamp, username, and request path
 * Automatically creates a `requests.log` file in the project root
@@ -139,7 +139,7 @@ The application includes a middleware that restricts access to chat features dur
 * Provides a clear error message to users
 * Logs all access attempts (including denied ones) via the Request Logging Middleware
 
-### How It Works
+### Time-Based Restriction Access (How It Works)
 
 The `RestrictAccessByTimeMiddleware` checks the current server time for each request:
 
@@ -170,6 +170,143 @@ The middleware is automatically enabled in `settings.py` and is positioned after
 2025-07-26 05:59:59.999999 - User: admin - Path: /api/v1/messages/ [ACCESS DENIED]
 2025-07-26 06:00:00.000001 - User: admin - Path: /api/v1/messages/
 ```
+
+## Offensive Language Middleware
+
+The application includes a middleware that limits the number of chat messages a user can send within a specific time window, helping to prevent abuse and ensure fair usage.
+
+### Features
+
+* Limits each IP address to 5 message requests per minute
+* Only applies to POST requests to message endpoints
+* Automatically cleans up old request data
+* Returns a 429 Too Many Requests response when the limit is exceeded
+
+### Offensive Language (How It Works)
+
+The `OffensiveLanguageMiddleware` tracks message submissions by IP address:
+
+* Each IP can make up to 5 POST requests to message endpoints per minute
+* The time window is a rolling 60-second period
+* Old requests (older than 1 minute) are automatically removed from tracking
+* The limit is applied per IP address to prevent abuse
+
+### Offensive Language Error Response
+
+When the rate limit is exceeded, the middleware returns:
+
+```http
+HTTP 429 Too Many Requests
+Content-Type: application/json
+
+{
+    "error": "Rate limit exceeded. Please try again later.",
+    "status": "error",
+    "code": 429
+}
+```
+
+### Offensive Language Configuration
+
+The middleware is automatically enabled in `settings.py` and is positioned after the `OffensiveLanguageMiddleware` in the middleware stack.
+
+### Example Usage
+
+```bash
+# First 5 requests within a minute
+POST /api/v1/conversations/1/messages/  # 201 Created
+POST /api/v1/conversations/1/messages/  # 201 Created
+POST /api/v1/conversations/1/messages/  # 201 Created
+POST /api/v1/conversations/1/messages/  # 201 Created
+POST /api/v1/conversations/1/messages/  # 201 Created
+
+# Sixth request within the same minute
+POST /api/v1/conversations/1/messages/  # 429 Too Many Requests
+
+# After 1 minute from the first request
+POST /api/v1/conversations/1/messages/  # 201 Created (limit resets)
+```
+
+## Role-Based Permission Middleware
+
+The application includes a middleware that enforces role-based access control (RBAC) for specific API endpoints, ensuring only authorized users can perform certain actions.
+
+### Role-Based Permission Features
+
+* Restricts access to protected endpoints based on user roles
+* Different permission levels for different paths
+* Clear error responses for unauthorized access attempts
+* Seamless integration with Django's authentication system
+
+### Protected Paths and Required Roles
+
+| Endpoint | Allowed Roles | HTTP Methods | Description |
+|----------|--------------|--------------|-------------|
+| `/api/v1/users/` | `admin` | POST, PUT, PATCH, DELETE | User management endpoints |
+| `/api/v1/conversations/` | `admin`, `moderator` | POST, PUT, PATCH, DELETE | Conversation management |
+
+### Role-Based Permission (How It Works)
+
+The `RolePermissionMiddleware`:
+
+1. Checks if the requested path is protected
+2. For protected paths and non-safe methods (POST, PUT, PATCH, DELETE):
+   * Verifies user authentication
+   * Checks if the user's role is in the allowed roles for the path
+   * Blocks access with appropriate error if not authorized
+3. Allows all GET, HEAD, and OPTIONS requests through for read operations
+
+### Error Responses
+
+**Unauthenticated User (401):**
+
+```http
+HTTP 401 Unauthorized
+Content-Type: application/json
+
+{
+    "error": "Authentication required",
+    "status": "error",
+    "code": 401
+}
+```
+
+**Insufficient Permissions (403):**
+
+```http
+HTTP 403 Forbidden
+Content-Type: application/json
+
+{
+    "error": "Insufficient permissions. Admin or moderator role required.",
+    "status": "error",
+    "code": 403
+}
+```
+
+### Configuration
+
+The middleware is automatically enabled in `settings.py` and is positioned after the authentication-related middlewares in the middleware stack.
+
+### Role-Based Permission Example Usage
+
+1. **Admin Access (Allowed):**
+
+   ```bash
+   # As an admin
+   curl -X DELETE http://localhost:8000/api/v1/users/3/ \
+     -H "Authorization: Bearer $ADMIN_TOKEN"
+   # Returns 204 No Content (success)
+   ```
+
+2. **Regular User Access (Denied):**
+
+   ```bash
+   # As a regular user
+   curl -X DELETE http://localhost:8000/api/v1/users/3/ \
+     -H "Authorization: Bearer $USER_TOKEN"
+   # Returns 403 Forbidden with error message
+   ```
 
 ## Authentication
 

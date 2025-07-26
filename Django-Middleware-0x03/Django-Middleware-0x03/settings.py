@@ -81,6 +81,7 @@ MIDDLEWARE = [
     "chats.middleware.RequestLoggingMiddleware",  # log requests
     "chats.middleware.RestrictAccessByTimeMiddleware",  # restricted access times
     "chats.middleware.OffensiveLanguageMiddleware",  # detect offensive language
+    "chats.middleware.RolePermissionMiddleware",  # user roles checking
 ]
 
 ROOT_URLCONF = "messaging_app.urls"
