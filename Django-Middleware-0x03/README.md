@@ -115,7 +115,7 @@ Example:
 
 * The file is automatically created when the first request is made.
 
-### Configuration
+### Request Logging Configuration
 
 The middleware is automatically enabled in `settings.py` and will start logging requests as soon as the server starts.
 
@@ -126,6 +126,49 @@ To monitor logs in real-time, you can use:
 ```bash
 tail -f requests.log  # Linux/Mac
 Get-Content -Path .\requests.log -Wait  # Windows PowerShell
+```
+
+## Time-Based Access Restriction Middleware
+
+The application includes a middleware that restricts access to chat features during specific hours to manage server load and user expectations.
+
+### Time-Based Restriction Access Features
+
+* Restricts access to chat endpoints between 9:00 PM and 6:00 AM (server time)
+* Returns a 403 Forbidden response during restricted hours
+* Provides a clear error message to users
+* Logs all access attempts (including denied ones) via the Request Logging Middleware
+
+### How It Works
+
+The `RestrictAccessByTimeMiddleware` checks the current server time for each request:
+
+* If the time is between 9:00 PM and 6:00 AM, access is denied
+* All other times, access is permitted
+* The restriction applies to all endpoints in the application
+
+### Error Response
+
+When access is denied, the middleware returns:
+
+```http
+HTTP 403 Forbidden
+Content-Type: text/plain
+
+Access to the chat is restricted between 9:00 PM and 6:00 AM. Please try again during working hours.
+```
+
+### Time-Based Access Restriction Configuration
+
+The middleware is automatically enabled in `settings.py` and is positioned after the `RequestLoggingMiddleware` in the middleware stack.
+
+### Example Log Entries
+
+```bash
+2025-07-26 20:59:59.999999 - User: admin - Path: /api/v1/conversations/
+2025-07-26 21:00:00.000001 - User: admin - Path: /api/v1/conversations/ [ACCESS DENIED]
+2025-07-26 05:59:59.999999 - User: admin - Path: /api/v1/messages/ [ACCESS DENIED]
+2025-07-26 06:00:00.000001 - User: admin - Path: /api/v1/messages/
 ```
 
 ## Authentication
