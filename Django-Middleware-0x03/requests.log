@@ -4,3 +4,10 @@
 2025-07-26 14:44:56.139008 - User: Anonymous - Path: /admin/login/
 2025-07-26 14:45:20.737250 - User: Anonymous - Path: /admin/login/
 2025-07-26 14:45:21.684716 - User: Anonymous - Path: /admin/
+2025-07-26 16:19:36.536048 - User: Collekta - Path: /api/v1/chats/
+2025-07-26 16:19:50.214313 - User: Collekta - Path: /api/v1/conversations/
+2025-07-26 16:20:02.808060 - User: Collekta - Path: /api-auth/logout/
+2025-07-26 16:20:02.823222 - User: Anonymous - Path: /api/v1/conversations/
+2025-07-26 16:20:04.063004 - User: Anonymous - Path: /api-auth/login/
+2025-07-26 16:20:46.540929 - User: Anonymous - Path: /api-auth/login/
+2025-07-26 16:20:47.603959 - User: kwame - Path: /api/v1/conversations/
