@@ -131,7 +131,7 @@ class OffensiveLanguageMiddleware:
         return self.get_response(request)
 
 
-class RolePermissionMiddleware:
+class RolepermissionMiddleware:
     """
     Middleware to enforce role-based access control.
     Only allows admin or moderator roles to perform certain actions.
