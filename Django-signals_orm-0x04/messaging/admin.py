@@ -9,7 +9,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 from rest_framework.permissions import IsAdminUser
 
-from .models import Conversation, Message, Notification
+from .models import Conversation, Message, MessageHistory, Notification
 
 User = get_user_model()
 
@@ -103,6 +103,13 @@ class MessageAdmin(admin.ModelAdmin):
         return IsAdminUser().has_permission(request, self)
 
 
+class MessageHistoryAdmin(admin.ModelAdmin):
+    list_display = ("message", "edited_by", "edited_at")
+    list_filter = ("edited_at", "edited_by")
+    search_fields = ("message__content", "edited_by__username")
+    readonly_fields = ("message", "content", "edited_by", "edited_at")
+
+
 # Custom Notification configuration
 class NotificationAdmin(admin.ModelAdmin):
     list_display = ("id", "user", "message", "is_read", "created_at")
@@ -114,4 +121,5 @@ class NotificationAdmin(admin.ModelAdmin):
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(Conversation, ConversationAdmin)
 admin.site.register(Message, MessageAdmin)
-admin.site.register(Notification)
+admin.site.register(Notification, NotificationAdmin)
+admin.site.register(MessageHistory, MessageHistoryAdmin)

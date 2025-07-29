@@ -109,19 +109,48 @@ class Message(models.Model):
     )
     content = models.TextField(null=False, verbose_name="message body")
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="sent at")
+    edited = models.BooleanField(default=False)
 
     def __str__(self):
         return f"Message from {self.sender.email} to {self.receiver.email} at {self.timestamp}"
 
+    def save(self, *args, **kwargs):
+        # Check if the message is being updated (has an ID) and content has changed
+        if self.pk and self.content != self.__class__.objects.get(pk=self.pk).content:
+            self.edited = True
+        super().save(*args, **kwargs)
+
+
+class MessageHistory(models.Model):
+    message = models.ForeignKey(
+        Message, on_delete=models.CASCADE, related_name="history"
+    )
+    content = models.TextField()
+    edited_at = models.DateTimeField(auto_now_add=True)
+    edited_by = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    class Meta:
+        ordering = ["-edited_at"]
+        verbose_name_plural = "Message Histories"
+
+    def __str__(self):
+        return (
+            f"Edit of {self.message.message_id} by {self.edited_by} at {self.edited_at}"
+        )
+
 
 class Notification(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
-    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='notifications')
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="notifications"
+    )
+    message = models.ForeignKey(
+        Message, on_delete=models.CASCADE, related_name="notifications"
+    )
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def __str__(self):
         return f"Notification for {self.user} - {self.message.content[:30]}..."
