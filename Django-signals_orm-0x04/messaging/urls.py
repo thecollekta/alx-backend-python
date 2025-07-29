@@ -17,6 +17,7 @@ from .views import (
     CustomTokenObtainPairView,
     MessageViewSet,
     UserViewSet,
+    delete_user,
 )
 
 # Create a router and register viewsets
@@ -62,4 +63,5 @@ urlpatterns = [
         ),
         name="conversation-messages-detail",
     ),
+    path("user/delete/", delete_user, name="delete_user"),
 ]

@@ -2,10 +2,12 @@
 
 """Viewsets for Conversation and Message models"""
 
+from django.contrib.auth import get_user_model
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
 
@@ -20,6 +22,8 @@ from .serializers import (
     MessageSerializer,
     UserSerializer,
 )
+
+User = get_user_model()
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -234,3 +238,21 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["DELETE"])
+@permission_classes([IsAuthenticated])
+def delete_user(request):
+    """
+    Delete the currently authenticated user and all their associated data.
+    """
+    try:
+        user = request.user
+        # The actual deletion will trigger the post_delete signal
+        user.delete()
+        return Response(
+            {"detail": "User account and all associated data have been deleted."},
+            status=status.HTTP_204_NO_CONTENT,
+        )
+    except Exception as e:
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

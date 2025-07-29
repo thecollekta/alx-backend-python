@@ -1,6 +1,7 @@
 # messaging/signals.py
 
-from django.db.models.signals import post_save, pre_save
+from django.contrib.auth import get_user_model
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 
 from .models import Message, MessageHistory, Notification
@@ -28,3 +29,35 @@ def log_message_edit(sender, instance, **kwargs):
                 )
         except Message.DoesNotExist:
             pass  # New message, no history to log
+
+
+User = get_user_model()
+
+
+@receiver(post_delete, sender=User)
+def delete_user_related_data(sender, instance, **kwargs):
+    """
+    Clean up user-related data when a user is deleted.
+    This includes:
+    - Messages sent by the user
+    - Messages received by the user
+    - Notifications related to the user
+    - Message history entries where the user was the editor
+    """
+    try:
+        # Delete messages where user is sender or receiver
+        Message.objects.filter(sender=instance).delete()
+        Message.objects.filter(receiver=instance).delete()
+
+        # Delete notifications related to the user
+        Notification.objects.filter(user=instance).delete()
+
+        # Delete message history where user was the editor
+        MessageHistory.objects.filter(edited_by=instance).delete()
+
+    except Exception as e:
+        # Log the error
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error cleaning up user data for user {instance.id}: {str(e)}")
