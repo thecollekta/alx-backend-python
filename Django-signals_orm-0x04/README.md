@@ -7,6 +7,7 @@ A robust messaging system built with Django that includes real-time notification
 - **User Authentication**: Secure user registration and authentication
 - **Conversations**: Create and manage conversations between users
 - **Real-time Messaging**: Send and receive messages in conversations
+- **Message History**: Track and view complete edit history of messages
 - **Notifications**: Automatic notifications for new messages
 - **RESTful API**: Built with Django REST Framework
 
@@ -26,8 +27,15 @@ A robust messaging system built with Django that includes real-time notification
 ### Message
 
 - Individual messages within a conversation
-- Fields: `message_id`, `sender`, `receiver`, `conversation`, `content`, `timestamp`
-- Related name: `notifications`
+- Fields: `message_id`, `sender`, `receiver`, `conversation`, `content`, `timestamp`, `edited`
+- Related names: `notifications`, `history`
+- The `edited` flag indicates if the message has been modified
+
+### MessageHistory
+
+- Tracks all edits made to messages
+- Fields: `message` (FK to Message), `content` (previous content), `edited_at`, `edited_by` (FK to User)
+- Ordered by `edited_at` in descending order
 
 ### Notification
 
@@ -51,13 +59,33 @@ A robust messaging system built with Django that includes real-time notification
 
 - `GET /api/conversations/{id}/messages/` - List messages in conversation
 - `POST /api/conversations/{id}/messages/` - Send new message
-- `PATCH /api/messages/{id}/` - Update message
+- `PATCH /api/messages/{id}/` - Update message (automatically tracks edit history)
 - `DELETE /api/messages/{id}/` - Delete message
+- `GET /api/messages/{id}/history/` - View edit history of a message
 
 ### Notifications
 
 - `GET /api/notifications/` - List user notifications
 - `PATCH /api/notifications/{id}/` - Mark notification as read
+
+## Message Edit History
+
+The application automatically tracks all edits made to messages:
+
+- Each time a message is edited, the previous version is saved to the `MessageHistory` model
+- The `edited` flag on the Message model is automatically set to `True` when content is modified
+- Edit history includes:
+  - Previous content
+  - Timestamp of edit
+  - User who made the edit
+
+### Viewing Edit History
+
+Edit history can be viewed:
+
+1. Through the Django admin interface
+2. Via the API endpoint: `GET /api/messages/{id}/history/`
+3. Each history entry shows the previous content and when/why it was changed
 
 ## Setup
 
