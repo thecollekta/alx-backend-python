@@ -32,7 +32,7 @@ conversations_router.register(
     r"messages", MessageViewSet, basename="conversation-messages"
 )
 
-app_name = "chats"
+app_name = "messaging"
 
 # Custom URL patterns for nested routes
 urlpatterns = [

@@ -61,7 +61,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.postgres",  # For PostgreSQL index feature
     # Local apps
-    "chats",
+    "messaging",
     # Third party apps
     "rest_framework",
     "rest_framework_simplejwt",
@@ -78,10 +78,10 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     # Custom Middlewares
-    "chats.middleware.RequestLoggingMiddleware",  # log requests
-    "chats.middleware.RestrictAccessByTimeMiddleware",  # restricted access times
-    "chats.middleware.OffensiveLanguageMiddleware",  # detect offensive language
-    "chats.middleware.RolepermissionMiddleware",  # user roles checking
+    "messaging.middleware.RequestLoggingMiddleware",  # log requests
+    "messaging.middleware.RestrictAccessByTimeMiddleware",  # restricted access times
+    "messaging.middleware.OffensiveLanguageMiddleware",  # detect offensive language
+    "messaging.middleware.RolepermissionMiddleware",  # user roles checking
 ]
 
 ROOT_URLCONF = "messaging_app.urls"
@@ -166,7 +166,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-AUTH_USER_MODEL = "chats.User"
+AUTH_USER_MODEL = "messaging.User"
 
 # REST Framework settings
 
