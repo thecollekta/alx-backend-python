@@ -1,4 +1,4 @@
-# messaging_app/chats/filters.py
+# messaging/filters.py
 
 import django_filters
 from django.utils.translation import gettext_lazy as _
@@ -21,20 +21,27 @@ class MessageFilter(django_filters.FilterSet):
         method="filter_sender",
     )
 
+    receiver = django_filters.ModelChoiceFilter(
+        field_name="receiver",
+        queryset=User.objects.all(),
+        label=_("Receiver (ID or username)"),
+        method="filter_user",
+    )
+
     start_date = django_filters.DateTimeFilter(
-        field_name="sent_at",
+        field_name="timestamp",
         lookup_expr="gte",
         label=_("Sent after (YYYY-MM-DD HH:MM:SS)"),
     )
 
     end_date = django_filters.DateTimeFilter(
-        field_name="sent_at",
+        field_name="timestamp",
         lookup_expr="lte",
         label=_("Sent before (YYYY-MM-DD HH:MM:SS)"),
     )
 
     search = django_filters.CharFilter(
-        field_name="message_body",
+        field_name="content",
         lookup_expr="icontains",
         label=_("Search in messages"),
     )
@@ -43,9 +50,11 @@ class MessageFilter(django_filters.FilterSet):
         model = Message
         fields = [
             "sender",
+            "receiver",
             "start_date",
             "end_date",
             "search",
+            "conversation",
         ]
 
     def filter_sender(self, queryset, name, value):
@@ -62,3 +71,8 @@ class MessageFilter(django_filters.FilterSet):
         except (ValueError, TypeError):
             # Fall back to username lookup
             return queryset.filter(sender__username__iexact=str(value))
+
+    def filter_user(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(**{f"{name}__pk": value.pk})

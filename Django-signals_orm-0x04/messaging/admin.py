@@ -1,14 +1,17 @@
 # messaging_app/chats/admin.py
 
 """
-Admin registration for chats app models: User, Conversation, Message, Notification
+Admin registration for chats app models: User, Conversation, Message
 """
 
 from django.contrib import admin
+from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin
 from rest_framework.permissions import IsAdminUser
 
-from .models import Conversation, Message, Notification, User
+from .models import Conversation, Message, Notification
+
+User = get_user_model()
 
 
 # Custom User Admin configuration
@@ -79,58 +82,36 @@ class MessageAdmin(admin.ModelAdmin):
     list_display = (
         "message_id",
         "sender",
+        "receiver",
         "conversation",
-        "sent_at",
-        "short_message_body",
+        "timestamp",
+        "short_content",
     )
-    list_filter = ("sender", "conversation")
-    search_fields = ("message_body", "sender__username")
-    date_hierarchy = "sent_at"
+    list_filter = ("sender", "receiver", "conversation")
+    search_fields = (
+        "content",
+        "sender__username",
+        "receiver",
+    )
+    date_hierarchy = "timestamp"
 
-    @admin.display(description="Message")
-    def short_message_body(self, obj):
-        return (
-            obj.message_body[:50] + "..."
-            if len(obj.message_body) > 50
-            else obj.message_body
-        )
+    @admin.display(description="Content")
+    def short_content(self, obj):
+        return obj.content[:50] + "..." if len(obj.content) > 50 else obj.content
 
     def has_module_permission(self, request):
         return IsAdminUser().has_permission(request, self)
 
 
 # Custom Notification configuration
-@admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    """Admin interface for Notification model"""
-
-    list_display = (
-        "user",
-        "get_message_snippet",
-        "notification_type",
-        "is_read",
-        "created_at",
-    )
-    list_filter = ("notification_type", "is_read", "created_at")
-    search_fields = (
-        "user__email",
-        "user__first_name",
-        "user__last_name",
-        "message__message_body",
-    )
-    readonly_fields = ("created_at", "notification_id")
-    date_hierarchy = "created_at"
-    list_select_related = ("user", "message")
-
-    @admin.display(description="Message Snippet")
-    def get_message_snippet(self, obj):
-        """Return a snippet of the message content"""
-        if obj.message and obj.message.message_body:
-            return f"{obj.message.message_body[:50]}..."
-        return "No message"
+    list_display = ("id", "user", "message", "is_read", "created_at")
+    list_filter = ("is_read", "created_at")
+    search_fields = ("user__username", "message__content")
 
 
 # Register models with admin site
 admin.site.register(User, CustomUserAdmin)
 admin.site.register(Conversation, ConversationAdmin)
 admin.site.register(Message, MessageAdmin)
+admin.site.register(Notification)

@@ -1,4 +1,4 @@
-# messaging_app/chats/urls.py
+# messaging/urls.py
 
 """
 URL configuration for chats app
@@ -32,7 +32,7 @@ conversations_router.register(
     r"messages", MessageViewSet, basename="conversation-messages"
 )
 
-app_name = "messaging"
+app_name = "chats"
 
 # Custom URL patterns for nested routes
 urlpatterns = [

@@ -1,4 +1,4 @@
-# messaging_app/chats/views.py
+# messaging/views.py
 
 """Viewsets for Conversation and Message models"""
 
@@ -150,10 +150,13 @@ class MessageViewSet(viewsets.ModelViewSet):
     ordering_fields = ["sent_at", "sender__username"]
     ordering = ["-sent_at"]
     search_fields = [
-        "message_body",
+        "content",
         "sender__first_name",
         "sender__last_name",
         "sender__username",
+        "receiver__first_name",
+        "receiver__last_name",
+        "receiver__username",
     ]
 
     def get_queryset(self):

@@ -1,9 +1,10 @@
-# chats/management/commands/create_test_data.py
+# messaging/management/commands/create_test_data.py
+
 from datetime import datetime, timedelta
 
-from chats.models import Conversation, Message
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
+from messaging.models import Conversation, Message
 
 User = get_user_model()
 
@@ -57,8 +58,8 @@ class Command(BaseCommand):
             Message.objects.create(
                 sender=sender,
                 conversation=convo,
-                message_body=text,
-                sent_at=datetime.now() - timedelta(minutes=len(messages) - i),
+                content=text,
+                timestamp=datetime.now() - timedelta(minutes=len(messages) - i),
             )
 
         self.stdout.write(

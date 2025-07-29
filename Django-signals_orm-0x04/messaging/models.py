@@ -1,4 +1,4 @@
-# messaging_app/chats/models.py
+# messaging/models.py
 
 """
 Django models for messaging system
@@ -85,7 +85,15 @@ class Conversation(models.Model):
 
 
 class Message(models.Model):
-    """Representation of a message sent by a user in a conversation"""
+    """Representation of a message sent by a user in a conversation
+
+    Fields:
+        - sender: The user who sent the message
+        - receiver: The user who will receive the message (direct message recipient)
+        - conversation: The conversation this message belongs to
+        - content (message_body): The actual message content
+        - timestamp (sent_at): When the message was sent
+    """
 
     message_id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, editable=False, db_index=True
@@ -93,59 +101,27 @@ class Message(models.Model):
     sender = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="sent_messages", null=False
     )
+    receiver = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="received_messages", null=False
+    )
     conversation = models.ForeignKey(
         Conversation, on_delete=models.CASCADE, related_name="messages", null=False
     )
-    message_body = models.TextField(null=False)
-    sent_at = models.DateTimeField(default=timezone.now)
+    content = models.TextField(null=False, verbose_name="message body")
+    timestamp = models.DateTimeField(default=timezone.now, verbose_name="sent at")
 
     def __str__(self):
-        return f"Message from {self.sender.email} at {self.sent_at}"
+        return f"Message from {self.sender.email} to {self.receiver.email} at {self.timestamp}"
 
 
 class Notification(models.Model):
-    """Model to store user notifications for new messages"""
-
-    NOTIFICATION_TYPES = [
-        ("message", "New Message"),
-        ("mention", "Mention"),
-        ("system", "System Notification"),
-    ]
-
-    notification_id = models.UUIDField(
-        primary_key=True, default=uuid.uuid4, editable=False, db_index=True
-    )
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="notifications",
-        help_text="The user who will receive this notification",
-    )
-    message = models.ForeignKey(
-        Message,
-        on_delete=models.CASCADE,
-        related_name="notifications",
-        help_text="The message that triggered this notification",
-        null=True,
-        blank=True,
-    )
-    notification_type = models.CharField(
-        max_length=20, choices=NOTIFICATION_TYPES, default="message"
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name='notifications')
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-created_at"]
-        indexes = [
-            models.Index(fields=["user", "is_read", "created_at"]),
-        ]
+        ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.notification_type} for {self.user.email}"
-
-    def mark_as_read(self):
-        """Mark this notification as read"""
-        if not self.is_read:
-            self.is_read = True
-            self.save(update_fields=["is_read"])
+        return f"Notification for {self.user} - {self.message.content[:30]}..."

@@ -1,4 +1,4 @@
-# messaging_app/chats/serializers.py
+# messaging/serializers.py
 
 """
 Serializers for User, Conversation, and Message models
@@ -76,12 +76,14 @@ class MessageSerializer(serializers.ModelSerializer):
 
     message_id = serializers.UUIDField(source="id", read_only=True)
     sender = UserSerializer(read_only=True)
-    message_body = serializers.CharField()
+    receiver = UserSerializer(read_only=True)
+    content = serializers.CharField(source="message_body")
+    timestamp = serializers.DateTimeField(source="sent_at", read_only=True)
 
     class Meta:
         model = Message
-        fields = ["message_id", "sender", "message_body", "sent_at"]
-        read_only_fields = ["message_id", "sent_at", "sender"]
+        fields = ["message_id", "sender", "receiver", "content", "timestamp"]
+        read_only_fields = ["message_id", "timestamp", "sender", "receiver"]
 
 
 class ConversationListSerializer(serializers.ModelSerializer):

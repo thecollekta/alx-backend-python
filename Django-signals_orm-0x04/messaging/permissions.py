@@ -1,4 +1,4 @@
-# messaging_app/chats/permissions.py
+# messaging/permissions.py
 
 from rest_framework import permissions
 

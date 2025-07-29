@@ -1,4 +1,4 @@
-# messaging_app/chats/auth.py
+# messaging/auth.py
 
 from django.conf import settings
 from rest_framework.exceptions import AuthenticationFailed
