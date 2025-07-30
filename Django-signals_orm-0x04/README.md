@@ -15,6 +15,7 @@ A robust messaging system built with Django that includes real-time notification
 - **Account Deletion**: Delete user account and associated data
 - **RESTful API**: Built with Django REST Framework
 - **Unread Messages**: Track and manage unread messages for each user
+- **Performance Caching**: Optimized response times with view-level caching
 
 ---
 
@@ -86,6 +87,55 @@ A robust messaging system built with Django that includes real-time notification
 ### User Account
 
 - `DELETE /api/user/delete/` - Delete the authenticated user's account and all associated data
+
+---
+
+## Performance Caching
+
+The application implements view-level caching to improve response times and reduce server load:
+
+### Caching Features
+
+- **View Caching**: Message list view is cached for 60 seconds
+- **Memory-Efficient**: Uses Django's built-in LocMemCache backend
+- **Automatic Invalidation**: Cache automatically expires after the timeout period
+- **User-Specific**: Cache is user-specific to maintain data privacy
+
+### Implementation Details
+
+- **Cache Backend**: Local memory cache (LocMemCache)
+- **Cache Key**: Automatically generated based on request URL and user session
+- **Cache Timeout**: 60 seconds for message list view
+- **Cache Invalidation**: Automatic after timeout or server restart
+
+### Cached Endpoints
+
+- `GET /api/conversations/{id}/messages/` - Cached for 60 seconds
+
+### Example Configuration
+
+```python
+# Cache settings in settings.py
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
+
+# View implementation
+@method_decorator(cache_page(60))
+def list(self, request, *args, **kwargs):
+    """List all messages in a conversation with caching."""
+    return super().list(request, *args, **kwargs)
+```
+
+### Best Practices
+
+1. **Cache Invalidation**: The cache automatically invalidates after the timeout period
+2. **Sensitive Data**: Cache respects authentication and permissions
+3. **Development**: Disable caching in development by setting `CACHES['default']['BACKEND']` to `'django.core.cache.backends.dummy.DummyCache'`
+4. **Production**: Consider using Redis or Memcached for production deployments
 
 ---
 
