@@ -182,7 +182,7 @@ class MessageViewSet(viewsets.ModelViewSet):
                 code=status.HTTP_403_FORBIDDEN,
             )
 
-        # Get the base queryset
+        # Get the base queryset with optimized field selection
         queryset = (
             Message.objects.filter(
                 conversation_id=conversation_id,
@@ -190,6 +190,20 @@ class MessageViewSet(viewsets.ModelViewSet):
             )
             .select_related("sender", "receiver", "conversation")
             .prefetch_related("replies__sender", "replies__receiver")
+            .only(
+                "message_id",
+                "sender__id",
+                "sender__username",
+                "receiver__id",
+                "receiver__username",
+                "conversation__id",
+                "content",
+                "timestamp",
+                "edited",
+                "is_thread",
+                "parent_message_id",
+                "read",
+            )
             .order_by("-timestamp")
         )
 
