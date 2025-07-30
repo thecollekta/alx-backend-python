@@ -16,6 +16,7 @@ from .views import (
     ConversationViewSet,
     CustomTokenObtainPairView,
     MessageViewSet,
+    UnreadMessagesView,
     UserViewSet,
     delete_user,
 )
@@ -69,5 +70,6 @@ urlpatterns = [
         MessageViewSet.as_view({"get": "thread"}),
         name="message-thread",
     ),
+    path("messages/unread/", UnreadMessagesView.as_view(), name="unread-messages"),
     path("user/delete/", delete_user, name="delete_user"),
 ]

@@ -84,6 +84,11 @@ class Conversation(models.Model):
         return f"Conversation {self.conversation_id}"
 
 
+class UnreadMessagesManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(read=False)
+
+
 class Message(models.Model):
     """Representation of a message sent by a user in a conversation
 
@@ -91,8 +96,11 @@ class Message(models.Model):
         - sender: The user who sent the message
         - receiver: The user who will receive the message (direct message recipient)
         - conversation: The conversation this message belongs to
-        - content (message_body): The actual message content
-        - timestamp (sent_at): When the message was sent
+        - content: The actual message content
+        - timestamp: When the message was sent
+        - read: Whether the message has been read by the receiver
+        - is_thread: Whether this message has replies
+        - parent_message: Reference to the parent message if this is a reply
     """
 
     message_id = models.UUIDField(
@@ -111,7 +119,6 @@ class Message(models.Model):
         "self",
         on_delete=models.CASCADE,
         related_name="replies",
-        related_query_name="replies",
         null=True,
         blank=True,
         db_index=True,
@@ -119,9 +126,16 @@ class Message(models.Model):
     content = models.TextField(null=False, verbose_name="message body")
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="sent at")
     edited = models.BooleanField(default=False)
+    read = models.BooleanField(
+        default=False, db_index=True, verbose_name="message read"
+    )
     is_thread = models.BooleanField(
         default=False, help_text="Whether this message is a thread starter"
     )
+
+    # Custom managers
+    objects = models.Manager()  # Default manager
+    unread = UnreadMessagesManager()  # Custom manager for unread messages
 
     class Meta:
         ordering = ["-timestamp"]

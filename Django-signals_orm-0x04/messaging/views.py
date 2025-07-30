@@ -8,12 +8,14 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .filters import MessageFilter
-from .models import Conversation, Message, User
+from .models import Conversation, Message
 from .pagination import MessagePagination
 from .permissions import IsMessageOwnerOrReadOnly, IsParticipantOfConversation
 from .serializers import (
@@ -275,6 +277,63 @@ class MessageViewSet(viewsets.ModelViewSet):
             )
         else:
             serializer.save(sender=self.request.user, conversation=conversation)
+
+
+class UnreadMessagesView(APIView):
+    """
+    View for retrieving and managing unread messages.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        """
+        Retrieve all unread messages for the current user.
+        Uses the custom unread manager with optimized queries.
+        """
+        # Use the custom manager to get unread messages
+        unread_messages = Message.unread.unread_for_user(request.user)
+
+        # Paginate the results
+        page = self.paginate_queryset(unread_messages)
+        if page is not None:
+            serializer = MessageSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = MessageSerializer(unread_messages, many=True)
+        return Response(serializer.data)
+
+    def patch(self, request, *args, **kwargs):
+        """
+        Mark specified messages as read.
+        Expects a list of message IDs in the request data.
+        """
+        message_ids = request.data.get("message_ids", [])
+        if not isinstance(message_ids, list):
+            return Response(
+                {"error": "message_ids must be a list of message IDs"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Use the custom manager to mark messages as read
+        updated_count = Message.unread.mark_as_read(message_ids, request.user)
+
+        return Response(
+            {"status": f"Marked {updated_count} message(s) as read"},
+            status=status.HTTP_200_OK,
+        )
+
+    def get_paginator(self):
+        if not hasattr(self, "_paginator"):
+            self._paginator = PageNumberPagination()
+            self._paginator.page_size = 20
+        return self._paginator
+
+    def paginate_queryset(self, queryset):
+        return self.get_paginator().paginate_queryset(queryset, self.request, view=self)
+
+    def get_paginated_response(self, data):
+        return self.get_paginator().get_paginated_response(data)
 
 
 @api_view(["DELETE"])

@@ -14,6 +14,7 @@ A robust messaging system built with Django that includes real-time notification
 - **Notifications**: Automatic notifications for new messages and replies
 - **Account Deletion**: Delete user account and associated data
 - **RESTful API**: Built with Django REST Framework
+- **Unread Messages**: Track and manage unread messages for each user
 
 ---
 
@@ -33,11 +34,12 @@ A robust messaging system built with Django that includes real-time notification
 ### Message
 
 - Individual messages within a conversation
-- Fields: `message_id`, `sender`, `receiver`, `conversation`, `content`, `timestamp`, `edited`, `is_thread`, `parent_message`
+- Fields: `message_id`, `sender`, `receiver`, `conversation`, `content`, `timestamp`, `edited`, `is_thread`, `parent_message`, `read`
 - Related names: `notifications`, `history`, `replies`
 - The `edited` flag indicates if the message has been modified
 - `is_thread` indicates if a message has replies
 - `parent_message` references the parent message for threaded replies
+- `read` indicates if the message has been read by the recipient
 
 ### MessageHistory
 
@@ -73,6 +75,8 @@ A robust messaging system built with Django that includes real-time notification
 - `PATCH /api/messages/{id}/` - Update message (automatically tracks edit history)
 - `DELETE /api/messages/{id}/` - Delete message
 - `GET /api/messages/{id}/history/` - View edit history of a message
+- `GET /api/messages/unread/` - List all unread messages for the current user
+- `PATCH /api/messages/unread/` - Mark messages as read
 
 ### Notifications
 
@@ -89,14 +93,14 @@ A robust messaging system built with Django that includes real-time notification
 
 The system supports threaded conversations where users can reply to specific messages:
 
-### Key Features
+### Threaded Conversations Features
 
 - **Threaded Replies**: Reply directly to any message to start a thread
 - **Nested Conversations**: View complete conversation threads
 - **Efficient Queries**: Optimized with `select_related` and `prefetch_related`
 - **Thread Indicators**: Messages with replies are marked with `is_thread: true`
 
-### How It Works
+### How It Works (Threaded Conversations)
 
 1. **Creating a Thread**:
    - Send a message with a `parent_message` ID to create a reply
@@ -159,6 +163,87 @@ Edit history can be viewed:
 1. Through the Django admin interface
 2. Via the API endpoint: `GET /api/messages/{id}/history/`
 3. Each history entry shows the previous content and when/why it was changed
+
+---
+
+## Unread Messages
+
+The system tracks unread messages for each user, allowing for efficient message status management:
+
+### Unread Messages Features
+
+- **Read Status Tracking**: Each message includes a `read` boolean field
+- **Efficient Queries**: Custom manager with optimized queries using `select_related` and `only()`
+- **Bulk Operations**: Mark multiple messages as read in a single request
+- **Performance**: Database indexes on the `read` field for fast lookups
+
+### How It Works (Unread Messages)
+
+1. **Message Status**:
+   - New messages are created with `read=False` by default
+   - The `read` status is automatically updated when the recipient views the message
+
+2. **Retrieving Unread Messages**:
+   - Use the custom manager: `Message.unread.unread_for_user(user)`
+   - Returns a queryset with only unread messages for the specified user
+   - Optimized to fetch only necessary fields
+
+3. **Marking Messages as Read**:
+   - Single endpoint for marking multiple messages as read
+   - Only marks messages that belong to the requesting user
+   - Returns the count of messages updated
+
+### Example API Usage (Unread Messages)
+
+1. **Get Unread Messages**:
+
+   ```http
+   GET /api/messages/unread/
+   ```
+
+   Response:
+
+   ```json
+   {
+     "count": 3,
+     "next": null,
+     "previous": null,
+     "results": [
+       {
+         "message_id": "550e8400-e29b-41d4-a716-446655440000",
+         "content": "Hello, this is an unread message",
+         "sender": {"id": 1, "username": "user1"},
+         "timestamp": "2025-07-30T10:00:00Z",
+         "read": false
+       }
+     ]
+   }
+   ```
+
+2. **Mark Messages as Read**:
+
+   ```http
+   PATCH /api/messages/unread/
+   {
+     "message_ids": ["550e8400-e29b-41d4-a716-446655440000"]
+   }
+   ```
+
+   Response:
+
+   ```json
+   {
+     "status": "Marked 1 message(s) as read"
+   }
+   ```
+
+### Performance Considerations
+
+- The unread messages query is optimized with:
+  - Database index on the `read` field
+  - `select_related` to prevent N+1 queries for related objects
+  - `only()` to fetch only necessary fields
+- The `mark_as_read` operation is atomic and uses a single database query
 
 ---
 
