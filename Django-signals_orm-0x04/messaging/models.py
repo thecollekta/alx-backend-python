@@ -107,9 +107,27 @@ class Message(models.Model):
     conversation = models.ForeignKey(
         Conversation, on_delete=models.CASCADE, related_name="messages", null=False
     )
+    parent_message = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        related_name="replies",
+        related_query_name="replies",
+        null=True,
+        blank=True,
+        db_index=True,
+    )
     content = models.TextField(null=False, verbose_name="message body")
     timestamp = models.DateTimeField(default=timezone.now, verbose_name="sent at")
     edited = models.BooleanField(default=False)
+    is_thread = models.BooleanField(
+        default=False, help_text="Whether this message is a thread starter"
+    )
+
+    class Meta:
+        ordering = ["-timestamp"]
+        indexes = [
+            models.Index(fields=["conversation", "parent_message"]),
+        ]
 
     def __str__(self):
         return f"Message from {self.sender.email} to {self.receiver.email} at {self.timestamp}"
@@ -119,6 +137,46 @@ class Message(models.Model):
         if self.pk and self.content != self.__class__.objects.get(pk=self.pk).content:
             self.edited = True
         super().save(*args, **kwargs)
+
+        # If this is a reply, mark the parent as a thread
+        if self.parent_message and not self.parent_message.is_thread:
+            self.parent_message.is_thread = True
+            self.parent_message.save(update_fields=["is_thread"])
+
+        super().save(*args, **kwargs)
+
+    def get_thread(self, include_self=True):
+        """
+        Get all messages in this thread (all replies to the same parent)
+        """
+        if self.parent_message:
+            # If this is a reply, get all messages in the same thread
+            thread_messages = Message.objects.filter(
+                parent_message=self.parent_message
+            ).select_related("sender", "receiver")
+        else:
+            # If this is a thread starter, get all its replies
+            thread_messages = Message.objects.filter(
+                parent_message=self
+            ).select_related("sender", "receiver")
+
+        if include_self and not self.parent_message:
+            # If this is a thread starter, include it in the results
+            thread_messages = list(thread_messages)
+            thread_messages.insert(0, self)
+
+        return thread_messages
+
+    def get_thread_depth(self):
+        """
+        Calculate the depth of this message in a thread
+        """
+        depth = 0
+        current = self
+        while current.parent_message:
+            depth += 1
+            current = current.parent_message
+        return depth
 
 
 class MessageHistory(models.Model):

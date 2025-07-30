@@ -1,6 +1,6 @@
-# Django Messaging System with Notifications
+# Django Messaging System with Notifications and Threaded Conversations
 
-A robust messaging system built with Django that includes real-time notifications using Django signals. This application allows users to have conversations and get notified about new messages
+A robust messaging system built with Django that includes real-time notifications and threaded conversations using Django's ORM.
 
 ---
 
@@ -9,8 +9,9 @@ A robust messaging system built with Django that includes real-time notification
 - **User Authentication**: Secure user registration and authentication
 - **Conversations**: Create and manage conversations between users
 - **Real-time Messaging**: Send and receive messages in conversations
+- **Threaded Conversations**: Reply to specific messages in a thread
 - **Message History**: Track and view complete edit history of messages
-- **Notifications**: Automatic notifications for new messages
+- **Notifications**: Automatic notifications for new messages and replies
 - **Account Deletion**: Delete user account and associated data
 - **RESTful API**: Built with Django REST Framework
 
@@ -32,9 +33,11 @@ A robust messaging system built with Django that includes real-time notification
 ### Message
 
 - Individual messages within a conversation
-- Fields: `message_id`, `sender`, `receiver`, `conversation`, `content`, `timestamp`, `edited`
-- Related names: `notifications`, `history`
+- Fields: `message_id`, `sender`, `receiver`, `conversation`, `content`, `timestamp`, `edited`, `is_thread`, `parent_message`
+- Related names: `notifications`, `history`, `replies`
 - The `edited` flag indicates if the message has been modified
+- `is_thread` indicates if a message has replies
+- `parent_message` references the parent message for threaded replies
 
 ### MessageHistory
 
@@ -64,8 +67,9 @@ A robust messaging system built with Django that includes real-time notification
 
 ### Messages
 
-- `GET /api/conversations/{id}/messages/` - List messages in conversation
-- `POST /api/conversations/{id}/messages/` - Send new message
+- `GET /api/conversations/{id}/messages/` - List top-level messages in conversation
+- `POST /api/conversations/{id}/messages/` - Send new message or reply
+- `GET /api/conversations/{id}/messages/{message_id}/thread/` - Get a message and all its replies
 - `PATCH /api/messages/{id}/` - Update message (automatically tracks edit history)
 - `DELETE /api/messages/{id}/` - Delete message
 - `GET /api/messages/{id}/history/` - View edit history of a message
@@ -78,11 +82,62 @@ A robust messaging system built with Django that includes real-time notification
 ### User Account
 
 - `DELETE /api/user/delete/` - Delete the authenticated user's account and all associated data
-  - Requires authentication
-  - Automatically cleans up all user-related data including:
-    - Messages (sent and received)
-    - Notifications
-    - Message edit history
+
+---
+
+## Threaded Conversations
+
+The system supports threaded conversations where users can reply to specific messages:
+
+### Key Features
+
+- **Threaded Replies**: Reply directly to any message to start a thread
+- **Nested Conversations**: View complete conversation threads
+- **Efficient Queries**: Optimized with `select_related` and `prefetch_related`
+- **Thread Indicators**: Messages with replies are marked with `is_thread: true`
+
+### How It Works
+
+1. **Creating a Thread**:
+   - Send a message with a `parent_message` ID to create a reply
+   - The system automatically marks the parent message as a thread
+
+2. **Viewing Threads**:
+   - Top-level messages are fetched by default
+   - Use the thread endpoint to view a message and all its replies
+   - Each message includes a `reply_count` and `thread_depth`
+
+3. **Performance**:
+   - Uses Django's ORM optimizations
+   - Database indexes on frequently queried fields
+   - Efficient recursive querying of thread hierarchies
+
+### Example API Usage
+
+1. **Create a new thread**:
+
+   ```http
+   POST /api/conversations/{conversation_id}/messages/
+   {
+       "content": "This is a new thread"
+   }
+   ```
+
+2. **Reply to a message**:
+
+   ```http
+   POST /api/conversations/{conversation_id}/messages/
+   {
+       "content": "This is a reply",
+       "parent_message": "message_id_here"
+   }
+   ```
+
+3. **View a thread**:
+
+   ```http
+   GET /api/conversations/{conversation_id}/messages/{message_id}/thread/
+   ```
 
 ---
 

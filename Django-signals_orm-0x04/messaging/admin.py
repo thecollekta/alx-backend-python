@@ -86,8 +86,9 @@ class MessageAdmin(admin.ModelAdmin):
         "conversation",
         "timestamp",
         "short_content",
+        "parent_message",
     )
-    list_filter = ("sender", "receiver", "conversation")
+    list_filter = ("sender", "receiver", "conversation", "timestamp", "edited")
     search_fields = (
         "content",
         "sender__username",

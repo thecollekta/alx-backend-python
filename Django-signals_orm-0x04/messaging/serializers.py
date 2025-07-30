@@ -79,11 +79,38 @@ class MessageSerializer(serializers.ModelSerializer):
     receiver = UserSerializer(read_only=True)
     content = serializers.CharField(source="message_body")
     timestamp = serializers.DateTimeField(source="sent_at", read_only=True)
+    is_thread = serializers.BooleanField(read_only=True)
+    thread_depth = serializers.SerializerMethodField()
+    reply_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
-        fields = ["message_id", "sender", "receiver", "content", "timestamp"]
-        read_only_fields = ["message_id", "timestamp", "sender", "receiver"]
+        fields = [
+            "message_id",
+            "sender",
+            "receiver",
+            "content",
+            "timestamp",
+            "is_thread",
+            "thread_depth",
+            "reply_count",
+            "parent_message",
+        ]
+        read_only_fields = [
+            "message_id",
+            "timestamp",
+            "sender",
+            "receiver",
+            "is_thread",
+            "thread_depth",
+            "reply_count",
+        ]
+
+    def get_thread_depth(self, obj):
+        return obj.get_thread_depth()
+
+    def get_reply_count(self, obj):
+        return obj.replies.count() if hasattr(obj, "replies") else 0
 
 
 class ConversationListSerializer(serializers.ModelSerializer):

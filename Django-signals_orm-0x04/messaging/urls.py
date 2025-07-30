@@ -24,6 +24,7 @@ from .views import (
 router = routers.DefaultRouter()
 router.register(r"users", UserViewSet, basename="user")
 router.register(r"conversations", ConversationViewSet, basename="conversation")
+router.register(r"messages", MessageViewSet, basename="message")
 
 # Create nested router for messages within conversations
 conversations_router = NestedDefaultRouter(
@@ -62,6 +63,11 @@ urlpatterns = [
             }
         ),
         name="conversation-messages-detail",
+    ),
+    path(
+        "conversations/<uuid:conversation_id>/messages/<uuid:pk>/thread/",
+        MessageViewSet.as_view({"get": "thread"}),
+        name="message-thread",
     ),
     path("user/delete/", delete_user, name="delete_user"),
 ]

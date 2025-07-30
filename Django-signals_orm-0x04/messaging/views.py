@@ -3,10 +3,11 @@
 """Viewsets for Conversation and Message models"""
 
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView
@@ -179,14 +180,20 @@ class MessageViewSet(viewsets.ModelViewSet):
                 code=status.HTTP_403_FORBIDDEN,
             )
 
-        # Return messages for this conversation with optimized queries
-        queryset = Message.objects.filter(conversation=conversation)
+        # Get the base queryset
+        queryset = (
+            Message.objects.filter(
+                conversation_id=conversation_id,
+                parent_message__isnull=True,  # Only get top-level messages by default
+            )
+            .select_related("sender", "receiver", "conversation")
+            .prefetch_related("replies__sender", "replies__receiver")
+            .order_by("-timestamp")
+        )
 
-        # Apply additional filtering
+        # Apply any filters
         queryset = self.filter_queryset(queryset)
-
-        # Return with related data
-        return queryset.select_related("sender", "conversation").order_by("-sent_at")
+        return queryset
 
     def create(self, request, *args, **kwargs):
         # Get conversation ID from URL
@@ -238,6 +245,36 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         self.perform_destroy(instance)
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=["get"])
+    def thread(self, request, conversation_id=None, pk=None):
+        """Get a message and all its replies as a thread"""
+        message = self.get_object()
+        thread_messages = message.get_thread(include_self=True)
+        serializer = self.get_serializer(thread_messages, many=True)
+        return Response(serializer.data)
+
+    def perform_create(self, serializer):
+        conversation_id = self.kwargs.get("conversation_id")
+        conversation = get_object_or_404(Conversation, id=conversation_id)
+
+        # Check if user is a participant in the conversation
+        if not conversation.participants.filter(pk=self.request.user.pk).exists():
+            raise PermissionDenied("You are not a participant in this conversation")
+
+        parent_message_id = serializer.validated_data.get("parent_message")
+        if parent_message_id:
+            parent_message = get_object_or_404(Message, id=parent_message_id)
+            if parent_message.conversation.conversation_id != conversation_id:
+                raise ValidationError("Parent message must be in the same conversation")
+
+            serializer.save(
+                sender=self.request.user,
+                conversation=conversation,
+                parent_message=parent_message,
+            )
+        else:
+            serializer.save(sender=self.request.user, conversation=conversation)
 
 
 @api_view(["DELETE"])

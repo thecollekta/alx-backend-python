@@ -61,3 +61,15 @@ def delete_user_related_data(sender, instance, **kwargs):
 
         logger = logging.getLogger(__name__)
         logger.error(f"Error cleaning up user data for user {instance.id}: {str(e)}")
+
+
+@receiver(post_save, sender=Message)
+def update_thread_metadata(sender, instance, created, **kwargs):
+    """
+    Update thread metadata when a new reply is added
+    """
+    if created and instance.parent_message:
+        # Update the parent message's is_thread flag
+        if not instance.parent_message.is_thread:
+            instance.parent_message.is_thread = True
+            instance.parent_message.save(update_fields=["is_thread"])
