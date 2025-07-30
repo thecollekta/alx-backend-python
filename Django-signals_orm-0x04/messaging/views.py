@@ -4,9 +4,15 @@
 
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
+from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.decorators import (
+    action,
+    api_view,
+    method_decorator,
+    permission_classes,
+)
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
@@ -154,17 +160,16 @@ class MessageViewSet(viewsets.ModelViewSet):
     ]
     filterset_class = MessageFilter
     pagination_class = MessagePagination
-    ordering_fields = ["sent_at", "sender__username"]
-    ordering = ["-sent_at"]
-    search_fields = [
-        "content",
-        "sender__first_name",
-        "sender__last_name",
-        "sender__username",
-        "receiver__first_name",
-        "receiver__last_name",
-        "receiver__username",
-    ]
+    ordering_fields = ["timestamp"]
+    search_fields = ["content"]
+
+    @method_decorator(cache_page(60))
+    def list(self, request, *args, **kwargs):
+        """
+        List all messages in a conversation with caching.
+        Cache timeout is set to 60 seconds.
+        """
+        return super().list(request, *args, **kwargs)
 
     def get_queryset(self):
         # Get conversation ID from URL
