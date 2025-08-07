@@ -2,25 +2,33 @@
 
 A Django REST API for messaging functionality with JWT authentication, conversation management, and message filtering capabilities.
 
-## Quick Start with Docker
+## Quick Start with Docker Compose
 
-The fastest way to get the application running is with Docker:
+The fastest way to get the application running is with Docker Compose:
 
-### Prerequisites (Docker)
+### Prerequisites
 
 - Docker Engine installed ([Installation Guide](https://docs.docker.com/engine/install/))
 - Docker Compose installed (usually included with Docker Desktop)
 
-### Docker Setup
+### Setup Instructions
 
-1. **Clone and Navigate to Project**:
+1. **Clone the repository and navigate to the project directory**:
 
     ```bash
     git clone <repository-url>
     cd messaging_app
     ```
 
-2. **Build and Start Services**:
+2. **Set up environment variables**:
+
+    ```bash
+    cp .env.example .env
+    ```
+
+    Edit the `.env` file with your preferred database credentials and settings.
+
+3. **Build and start the services**:
 
     ```bash
     docker-compose up --build
@@ -28,17 +36,17 @@ The fastest way to get the application running is with Docker:
 
    This will:
    - Build the Django application image
-   - Start PostgreSQL database
+   - Start a MySQL database container
    - Apply database migrations
-   - Create test data and admin user
+   - Create a superuser (admin) account
    - Start the development server on `http://localhost:8000`
 
-3. **Access the Application**:
+4. **Access the application**:
    - API: `http://localhost:8000/api/v1/`
    - Admin Panel: `http://localhost:8000/admin/`
    - Default admin credentials: `admin` / `admin123`
 
-4. **Stop Services**:
+5. **Stop services when done**:
 
     ```bash
     docker-compose down
@@ -129,6 +137,57 @@ If you prefer to set up the development environment manually:
     python manage.py runserver
     ```
 
+## MySQL Setup Instructions
+
+### Prerequisites (MySQL)
+
+- MySQL Server installed ([Installation Guide](https://dev.mysql.com/doc/refman/8.0/en/installing.html))
+- MySQL Client installed ([Installation Guide](https://dev.mysql.com/doc/refman/8.0/en/installing.html))
+
+### Setup Instructions (MySQL)
+
+1. **Create a new MySQL database**:
+
+    ```sql
+    CREATE DATABASE messaging_app;
+    ```
+
+2. **Create a new MySQL user**:
+
+    ```sql
+    CREATE USER 'messaging_user'@'%' IDENTIFIED BY 'your-secure-password';
+    ```
+
+3. **Grant privileges to the new user**:
+
+    ```sql
+    GRANT ALL PRIVILEGES ON messaging_app.* TO 'messaging_user'@'%';
+    ```
+
+4. **Apply database migrations**:
+
+    ```bash
+    python manage.py migrate
+    ```
+
+5. **Create test data**:
+
+    ```bash
+    python manage.py create_test_data
+    ```
+
+6. **Create admin user**:
+
+    ```bash
+    python manage.py createsuperuser
+    ```
+
+7. **Start development server**:
+
+    ```bash
+    python manage.py runserver
+    ```
+
 ## Environment Configuration
 
 ### Docker Environment (.env.docker)
@@ -170,6 +229,7 @@ DB_PORT=5432
 - django-filter (for API filtering)
 - psycopg (PostgreSQL adapter)
 - python-dateutil (for date handling)
+- mysqlclient (MySQL adapter)
 
 ## Project Structure
 
