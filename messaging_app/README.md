@@ -1,79 +1,207 @@
 # Messaging App API
 
-## Setup
+A Django REST API for messaging functionality with JWT authentication, conversation management, and message filtering capabilities.
 
-1. Create a virtual environment: `python -m venv .venv`
-2. Activate the environment:
+## Quick Start with Docker
 
-   ```bash
-   source .venv/scripts/activate  # Windows
-   source .venv/bin/activate     # MacOS/Linux
-   ```
+The fastest way to get the application running is with Docker:
 
-3. Install dependencies: `pip install -r requirements.txt`
-4. Apply migrations: `python manage.py migrate`
-5. Create test data: `python manage.py create_test_data`
-6. Create admin user: `python manage.py createsuperuser`
-7. Start development server: `python manage.py runserver`
+### Prerequisites (Docker)
+
+- Docker Engine installed ([Installation Guide](https://docs.docker.com/engine/install/))
+- Docker Compose installed (usually included with Docker Desktop)
+
+### Docker Setup
+
+1. **Clone and Navigate to Project**:
+
+    ```bash
+    git clone <repository-url>
+    cd messaging_app
+    ```
+
+2. **Build and Start Services**:
+
+    ```bash
+    docker-compose up --build
+    ```
+
+   This will:
+   - Build the Django application image
+   - Start PostgreSQL database
+   - Apply database migrations
+   - Create test data and admin user
+   - Start the development server on `http://localhost:8000`
+
+3. **Access the Application**:
+   - API: `http://localhost:8000/api/v1/`
+   - Admin Panel: `http://localhost:8000/admin/`
+   - Default admin credentials: `admin` / `admin123`
+
+4. **Stop Services**:
+
+    ```bash
+    docker-compose down
+    ```
+
+### Docker Commands
+
+```bash
+# Build only the web service
+docker-compose build web
+
+# Start services in detached mode
+docker-compose up -d
+
+# View logs
+docker-compose logs web
+docker-compose logs db
+
+# Execute commands in running container
+docker-compose exec web python manage.py shell
+docker-compose exec web python manage.py createsuperuser
+
+# Stop and remove containers, networks, and volumes
+docker-compose down -v
+```
+
+## Manual Setup (Alternative)
+
+If you prefer to set up the development environment manually:
+
+### Prerequisites (Python)
+
+- Python 3.12+
+- PostgreSQL 17+
+- pip (Python package installer)
+
+### Installation Steps
+
+1. **Create a virtual environment**:
+
+    ```bash
+    python -m venv .venv
+    ```
+
+2. **Activate the environment**:
+
+    ```bash
+    source .venv/scripts/activate  # Windows
+    source .venv/bin/activate     # MacOS/Linux
+    ```
+
+3. **Install dependencies**:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4. **Set up PostgreSQL database** and create a database named `messaging_app_db`
+
+5. **Environment Configuration**:
+
+    ```bash
+    cp .env.docker .env
+    # Edit .env file with your database credentials
+    ```
+
+6. **Apply migrations**:
+
+    ```bash
+    python manage.py migrate
+    ```
+
+7. **Create test data**:
+
+    ```bash
+    python manage.py create_test_data
+    ```
+
+8. **Create admin user**:
+
+    ```bash
+    python manage.py createsuperuser
+    ```
+
+9. **Start development server**:
+
+    ```bash
+    python manage.py runserver
+    ```
 
 ## Environment Configuration
 
-1. Create .env file from template:
+### Docker Environment (.env.docker)
 
-   ```bash
-   cp .env.example .env
-   ```
+For Docker setup, use the provided `.env.docker` template:
 
-2. Set required values:
+```env
+SECRET_KEY=your_django_secret_key
+DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+DB_NAME=messaging_app_db
+DB_USER=messaging_user
+DB_PASSWORD=messaging_pass
+DB_HOST=db
+DB_PORT=5432
+```
 
-   ```env
-   SECRET_KEY=your_django_secret_key
-   DEBUG=True
-   ALLOWED_HOSTS=localhost,127.0.0.1
-   DB_NAME=your_db_name
-   DB_USER=your_db_user
-   DB_PASSWORD=your_db_password
-   DB_HOST=localhost
-   DB_PORT=5432
-   ```
+### Local Development Environment
+
+For manual setup, create `.env` file:
+
+```env
+SECRET_KEY=your_django_secret_key
+DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+DB_NAME=your_local_db_name
+DB_USER=your_db_user
+DB_PASSWORD=your_db_password
+DB_HOST=localhost
+DB_PORT=5432
+```
 
 ## Dependencies
 
-* Django 5.2.4+
-* Django REST Framework 3.14.0+
-* djangorestframework-simplejwt (JWT Authentication)
-* django-environ (for environment variables)
-* django-filter (for API filtering)
-* psycopg2-binary (PostgreSQL adapter)
-* python-dotenv (for local development)
+- Django 5.2.4+
+- Django REST Framework 3.16.0+
+- djangorestframework-simplejwt (JWT Authentication)
+- django-environ (for environment variables)
+- django-filter (for API filtering)
+- psycopg (PostgreSQL adapter)
+- python-dateutil (for date handling)
 
 ## Project Structure
 
 ```text
 messaging_app/
-├── .venv/             # Virtual environment
-├── chats/             # Messaging app
-│   ├── migrations/    # Database migrations
-│   ├── management/    # Custom management commands
+├── .venv/                 # Virtual environment
+├── chats/                 # Messaging app
+│   ├── migrations/        # Database migrations
+│   ├── management/        # Custom management commands
 │   ├── __init__.py
-│   ├── admin.py       # Admin panel config
+│   ├── admin.py           # Admin panel config
 │   ├── apps.py
-│   ├── models.py      # Data models
-│   ├── permissions.py # Custom permissions
-│   ├── serializers.py # API serializers
-│   ├── urls.py       # API endpoints
-│   └── views.py      # View logic
-├── messaging_app/     # Project config
+│   ├── models.py          # Data models
+│   ├── permissions.py     # Custom permissions
+│   ├── serializers.py     # API serializers
+│   ├── urls.py            # API endpoints
+│   └── views.py           # View logic
+├── messaging_app/         # Project config
 │   ├── __init__.py
 │   ├── asgi.py
-│   ├── settings.py   # Django settings
-│   ├── urls.py      # Main URL routing
+│   ├── settings.py        # Django settings
+│   ├── urls.py            # Main URL routing
 │   └── wsgi.py
-├── .env.example     # Environment variable template
+├── .env.docker            # Docker environment template
+├── .dockerignore          # Docker ignore file
+├── docker-compose.yml     # Docker Compose configuration
+├── Dockerfile             # Docker image definition
+├── entrypoint.sh          # Docker entrypoint script
 ├── .gitignore
 ├── manage.py
-├── README.md        # Project documentation
-└── requirements.txt # Dependencies file
+├── README.md              # Project documentation
+└── requirements.txt       # Dependencies file
 ```
 
 ## Authentication
@@ -84,36 +212,36 @@ The API uses JWT (JSON Web Tokens) for authentication.
 
 1. **Get Access Token**:
 
-   ```bash
-   POST /api/v1/token/
-   {
-     "username": "your_username",
-     "password": "your_password"
-   }
-   ```
+    ```bash
+    POST /api/v1/token/
+    {
+      "username": "your_username",
+      "password": "your_password"
+    }
+    ```
 
 2. **Using the Token**:
    Include the token in the Authorization header:
 
-   ```bash
-   Authorization: Bearer your_token_here
-   ```
+    ```bash
+    Authorization: Bearer your_token_here
+    ```
 
 3. **Refresh Token**:
 
-   ```bash
-   POST /api/v1/token/refresh/
-   {
-     "refresh": "your_refresh_token_here"
-   }
-   ```
+    ```bash
+    POST /api/v1/token/refresh/
+    {
+      "refresh": "your_refresh_token_here"
+    }
+    ```
 
 ## Permissions
 
-* **IsAuthenticated**: Required for all API endpoints
-* **IsParticipantOfConversation**: Users must be participants to view/modify conversations
-* **IsMessageOwnerOrReadOnly**: Only message owners can edit/delete their messages
-* **IsAdminUser**: Required for admin interface access
+- **IsAuthenticated**: Required for all API endpoints
+- **IsParticipantOfConversation**: Users must be participants to view/modify conversations
+- **IsMessageOwnerOrReadOnly**: Only message owners can edit/delete their messages
+- **IsAdminUser**: Required for admin interface access
 
 ## API Endpoints
 
@@ -154,24 +282,24 @@ GET /api/v1/conversations/{conversation_id}/messages/
 
 **Pagination**:
 
-* Returns 20 messages per page by default
-* Use `page` parameter to navigate through pages
-* Customize page size with `page_size` parameter (max 100)
+- Returns 20 messages per page by default
+- Use `page` parameter to navigate through pages
+- Customize page size with `page_size` parameter (max 100)
 
 **Filtering**:
 
-* `sender`: Filter by sender ID or username
-* `start_date`: Filter messages sent after this date (YYYY-MM-DD HH:MM:SS)
-* `end_date`: Filter messages sent before this date (YYYY-MM-DD HH:MM:SS)
-* `search`: Search in message content (case-insensitive)
+- `sender`: Filter by sender ID or username
+- `start_date`: Filter messages sent after this date (YYYY-MM-DD HH:MM:SS)
+- `end_date`: Filter messages sent before this date (YYYY-MM-DD HH:MM:SS)
+- `search`: Search in message content (case-insensitive)
 
 **Sorting**:
 
-* Use `ordering` parameter with:
-  * `sent_at` (ascending)
-  * `-sent_at` (descending, default)
-  * `sender__username` (alphabetical by sender)
-  * `-sender__username` (reverse alphabetical by sender)
+- Use `ordering` parameter with:
+  - `sent_at` (ascending)
+  - `-sent_at` (descending, default)
+  - `sender__username` (alphabetical by sender)
+  - `-sender__username` (reverse alphabetical by sender)
 
 **Example Request**:
 
@@ -195,229 +323,38 @@ GET /api/v1/conversations/{conversation_id}/messages/?start_date=2025-07-01&end_
 GET /api/v1/conversations/{conversation_id}/messages/?sender=kwame&start_date=2025-07-01&search=hello
 ```
 
-**Example Response**:
+## Testing the API
 
-```json
-{
-  "links": {
-    "next": "http://api.example.org/conversations/{conversation_id}/messages/?page=2",
-    "previous": null
-  },
-  "count": 42,
-  "total_pages": 3,
-  "current_page": 1,
-  "results": [
-    {
-      "id": "550e8400-e29b-41d4-a716-446655440000",
-      "message_body": "Hello, how are you?",
-      "sent_at": "2025-07-01T12:00:00Z",
-      "sender": {
-        "id": 1,
-        "username": "kwame",
-        "first_name": "Kwame",
-        "last_name": "Mensah"
-      }
-    },
-    {
-      "id": "550e8400-e29b-41d4-a716-446655440001",
-      "message_body": "I'm doing well, thanks!",
-      "sent_at": "2025-07-01T12:05:00Z",
-      "sender": {
-        "id": 2,
-        "username": "ama",
-        "first_name": "Ama",
-        "last_name": "Agyei"
-      }
-    }
-  ]
-}
+### Docker Environment
+
+With Docker running, you can test the API:
+
+```bash
+# Get token for test user 'kwame'
+curl -X POST http://localhost:8000/api/v1/token/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "kwame", "password": "testpass123"}'
+
+# Use the returned token to access protected endpoints
+curl -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  http://localhost:8000/api/v1/conversations/
 ```
 
-## API Documentation
+### Test Data
 
-### 1. Message API Overview
-
-The Message API provides endpoints for managing conversations and messages with features like authentication, pagination, filtering, and permission controls. It uses JWT for authentication and follows RESTful principles.
-
-### 2. Authentication Tests
-
-#### 2.1 Get JWT Token
-
-**Description**:
-This endpoint authenticates users and returns JWT tokens for accessing protected endpoints. The access token should be included in the `Authorization` header for subsequent requests.
-
-**Endpoint**: `POST /api/v1/token/`
-
-**Request Body**:
-
-```json
-{
-    "username": "string",
-    "password": "string"
-}
-```
-
-**Response**:
-
-* 200 OK: Returns access and refresh tokens
-* 401 Unauthorized: Invalid credentials
-
-**Usage**:
-
-* First step in the authentication flow
-* Tokens expire after 1 hour (configurable)
-* Use refresh token to get new access tokens
-
-### 3. Conversation Tests
-
-#### 3.1 Create a New Conversation
-
-**Description**:
-Creates a new conversation between the authenticated user and specified participants. The creator is automatically added as a participant.
-
-**Endpoint**: `POST /api/v1/conversations/`
-
-**Headers**:
-
-* `Authorization: Bearer <token>`
-* `Content-Type: application/json`
-
-**Request Body**:
-
-```json
-{
-    "participants": [2, 3]
-}
-```
-
-**Response**:
-
-* 201 Created: Returns the created conversation
-* 400 Bad Request: Invalid participant data
-* 401 Unauthorized: Missing or invalid token
-
-### 4. Message Tests
-
-#### 4.1 Send a Message
-
-**Description**:
-Sends a new message to a specified conversation. The sender is automatically set to the authenticated user.
-
-**Endpoint**: `POST /api/v1/conversations/{conversation_id}/messages/`
-
-**Headers**:
-
-* `Authorization: Bearer <token>`
-* `Content-Type: application/json`
-
-**Request Body**:
-
-```json
-{
-    "message_body": "Your message here"
-}
-```
-
-**Response**:
-
-* 201 Created: Returns the created message
-* 403 Forbidden: User is not a participant in the conversation
-* 404 Not Found: Conversation does not exist
-
-#### 4.2 List Messages with Pagination
-
-**Description**:
-Retrieves messages from a conversation with pagination support. Returns 20 messages per page by default.
-
-**Endpoint**: `GET /api/v1/conversations/{conversation_id}/messages/`
-
-**Query Parameters**:
-
-* `page`: Page number (default: 1)
-* `page_size`: Number of messages per page (default: 20, max: 100)
-
-**Response**:
-
-* 200 OK: Returns paginated list of messages
-* 403 Forbidden: User is not a participant
-* 404 Not Found: Conversation does not exist
-
-### 5. Permission Tests
-
-#### 5.1 Test Unauthorized Access
-
-**Description**:
-Verifies that protected endpoints reject requests without valid authentication.
-
-**Test Cases**:
-
-* Access any protected endpoint without token
-* Expected: 401 Unauthorized
-* Purpose: Ensures security of protected resources
-
-#### 5.2 Test Access to Other User's Conversation
-
-**Description**:
-Verifies that users can only access conversations they participate in.
-
-**Test Flow**:
-
-1. User A creates a conversation
-2. User B attempts to access User A's conversation
-3. Expected: 403 Forbidden
-
-**Purpose**:
-
-* Validates conversation privacy
-* Ensures proper access control implementation
-
-### 6. Filtering
-
-#### 6.1 Filter Messages by Date Range
-
-**Description**:
-Retrieves messages sent within a specific date range.
-
-**Endpoint**: `GET /api/v1/conversations/{conversation_id}/messages/`
-
-**Query Parameters**:
-
-* `start_date`: Messages sent after this datetime (ISO 8601 format)
-* `end_date`: Messages sent before this datetime (ISO 8601 format)
-
-**Example**:
-
-```text
-GET /api/v1/conversations/1/messages/?start_date=2023-01-01T00:00:00Z&end_date=2023-12-31T23:59:59Z
-```
-
-**Response**:
-
-* 200 OK: Returns filtered messages
-* 400 Bad Request: Invalid date format
-* 403 Forbidden: User is not a participant
-
-**Usage**:
-
-* Useful for retrieving messages from a specific time period
-* Supports timezone-aware datetime strings
-* Can be combined with other filters and pagination
-
-## Test Data
-
-Pre-created test users:
+Pre-created test users (available after running `create_test_data` command):
 
 1. **Kwame Mensah**
-   * Username: `kwame`
-   * Password: `testpass123`
+   - Username: `kwame`
+   - Password: `testpass123`
 
 2. **Ama Agyei**
-   * Username: `ama`
-   * Password: `testpass123`
+   - Username: `ama`
+   - Password: `testpass123`
 
 3. **Kofi Asante**
-   * Username: `kofi`
-   * Password: `testpass123`
+   - Username: `kofi`
+   - Password: `testpass123`
 
 **Note**: Kwame and Ama share a conversation with test messages in Twi.
 
@@ -426,7 +363,7 @@ Pre-created test users:
 ### 1. Unauthenticated Access (401)
 
 ```bash
-curl -X GET http://127.0.0.1:8000/api/v1/conversations/
+curl -X GET http://localhost:8000/api/v1/conversations/
 # Should return 401 Unauthorized
 ```
 
@@ -434,58 +371,42 @@ curl -X GET http://127.0.0.1:8000/api/v1/conversations/
 
 ```bash
 # Get Kofi's token
-TOKEN=$(curl -X POST http://127.0.0.1:8000/api/v1/token/ \
+TOKEN=$(curl -X POST http://localhost:8000/api/v1/token/ \
   -H "Content-Type: application/json" \
   -d '{"username": "kofi", "password": "testpass123"}' | jq -r '.access')
 
 # Try to access Kwame and Ama's conversation
 curl -H "Authorization: Bearer $TOKEN" \
-  http://127.0.0.1:8000/api/v1/conversations/1/
-# Should return 403 Forbidden
-```
-
-### 3. Message Operations
-
-```bash
-# Get Kwame's token
-TOKEN=$(curl -X POST http://127.0.0.1:8000/api/v1/token/ \
-  -H "Content-Type: application/json" \
-  -d '{"username": "kwame", "password": "testpass123"}' | jq -r '.access')
-
-# Try to edit Ama's message (should fail)
-curl -X PATCH http://127.0.0.1:8000/api/v1/conversations/{conversation_id}/messages/2/ \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"message_body": "Edited message"}'
+  http://localhost:8000/api/v1/conversations/1/
 # Should return 403 Forbidden
 ```
 
 ## Admin Interface
 
-Access the admin interface at `http://127.0.0.1:8000/admin/` using admin credentials.
+Access the admin interface at `http://localhost:8000/admin/` using admin credentials.
+
+### Default Admin Credentials (Docker)
+
+- **Username**: `admin`
+- **Password**: `admin123`
 
 ### Admin Features
 
-* User management (create, edit, delete users)
-
-* View all conversations
-* Monitor messages
-* User role management
-
-## Security Considerations
-
-* Always use HTTPS in production
-* Tokens expire after 1 hour (configurable in settings)
-* Refresh tokens expire after 1 day
-* Passwords are hashed before storage
-* Admin interface is protected by `IsAdminUser`
-* Rate limiting recommended for authentication endpoints
+- User management (create, edit, delete users)
+- View all conversations
+- Monitor messages
+- User role management
 
 ## Development
 
 ### Creating Migrations
 
 ```bash
+# In Docker environment
+docker-compose exec web python manage.py makemigrations
+docker-compose exec web python manage.py migrate
+
+# In manual setup
 python manage.py makemigrations
 python manage.py migrate
 ```
@@ -493,15 +414,125 @@ python manage.py migrate
 ### Running Tests
 
 ```bash
+# In Docker environment
+docker-compose exec web python manage.py test
+
+# In manual setup
 python manage.py test
 ```
 
-### Creating Admin User
+### Accessing Django Shell
 
 ```bash
-python manage.py createsuperuser
-# Follow the prompts to create admin credentials
+# In Docker environment
+docker-compose exec web python manage.py shell
+
+# In manual setup
+python manage.py shell
 ```
+
+## Production Deployment
+
+### Docker Production Setup
+
+1. **Create production Docker Compose file** (`docker-compose.prod.yml`):
+   - Use production-ready PostgreSQL configuration
+   - Set proper environment variables
+   - Configure nginx for static file serving
+   - Use gunicorn instead of development server
+
+2. **Security Considerations**:
+   - Use secure `SECRET_KEY`
+   - Set `DEBUG=False`
+   - Configure proper `ALLOWED_HOSTS`
+   - Use SSL/TLS certificates
+   - Implement proper backup strategies
+
+3. **Environment Variables**:
+   - Use Docker secrets or external secret management
+   - Never commit production credentials to version control
+
+## Troubleshooting
+
+### Common Docker Issues
+
+1. **Port Already in Use**:
+
+   ```bash
+   # Change port in docker-compose.yml or stop conflicting service
+   docker-compose down
+   sudo lsof -i :8000  # Find what's using port 8000
+   ```
+
+2. **Database Connection Issues**:
+
+   ```bash
+   # Check if PostgreSQL container is running
+   docker-compose logs db
+   # Restart services
+   docker-compose restart
+   ```
+
+3. **Permission Issues**:
+
+   ```bash
+   # Fix file permissions (Linux/macOS)
+   sudo chown -R $USER:$USER .
+   ```
+
+4. **Container Build Issues**:
+
+   ```bash
+   # Clear Docker cache and rebuild
+   docker-compose down -v
+   docker system prune -a
+   docker-compose up --build
+   ```
+
+### Common Development Issues
+
+1. **Migration Issues**:
+
+   ```bash
+   # Reset migrations (development only)
+   docker-compose exec web python manage.py migrate --fake-initial
+   ```
+
+2. **Static Files Not Loading**:
+
+   ```bash
+   # Collect static files
+   docker-compose exec web python manage.py collectstatic
+   ```
+
+## Security Considerations
+
+- Always use HTTPS in production
+- Tokens expire after 1 hour (configurable in settings)
+- Refresh tokens expire after 1 day
+- Passwords are hashed before storage
+- Admin interface is protected by `IsAdminUser`
+- Rate limiting recommended for authentication endpoints
+- Use proper secrets management in production
+- Regular security audits and dependency updates
+
+## Performance Optimization
+
+- Database query optimization with `select_related`/`prefetch_related`
+- Implement Redis caching for production
+- Use CDN for static file delivery
+- Database connection pooling
+- Implement API rate limiting
+- Monitor with APM tools (Sentry, New Relic)
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
 
 ## License
 
