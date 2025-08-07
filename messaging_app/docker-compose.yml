@@ -12,7 +12,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - mysql_data:/var/lib/mysql # Persistent volume for database
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
@@ -36,8 +36,8 @@ services:
       - DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
     volumes:
       - .:/app
-      - static_volume:/app/staticfiles
-      - media_volume:/app/media
+      - static_volume:/app/staticfiles  # Persistent volume for static files
+      - media_volume:/app/media # Persistent volume for media files
     depends_on:
       db:
         condition: service_healthy
@@ -49,6 +49,6 @@ services:
              python3 manage.py runserver 0.0.0.0:8000"
 
 volumes:
-  mysql_data:
-  static_volume:
-  media_volume:
+  mysql_data: # Named volume for database persistence
+  static_volume:  # Named volume for static files
+  media_volume: # Named volume for media files

@@ -11,6 +11,16 @@ The fastest way to get the application running is with Docker Compose:
 - Docker Engine installed ([Installation Guide](https://docs.docker.com/engine/install/))
 - Docker Compose installed (usually included with Docker Desktop)
 
+### Data Persistence
+
+The application uses Docker volumes to ensure data persistence:
+
+- **Database data**: Stored in `mysql_data` volume (persists across container restarts)
+- **Static files**: Stored in `static_volume` volume
+- **Media files**: Stored in `media_volume` volume
+
+These volumes are preserved even when containers are stopped. To completely remove data, use `docker-compose down -v`.
+
 ### Setup Instructions
 
 1. **Clone the repository and navigate to the project directory**:
