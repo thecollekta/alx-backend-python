@@ -83,6 +83,113 @@ docker-compose exec web python manage.py createsuperuser
 docker-compose down -v
 ```
 
+---
+
+## Kubernetes Local Setup
+
+This project includes a script to set up a local Kubernetes cluster for development and testing purposes using Minikube.
+
+### Kubernetes (Prerequisites)
+
+- [Minikube](https://minikube.sigs.k8s.io/docs/start/)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/)
+- [Docker](https://docs.docker.com/get-docker/)
+
+### Using kurbeScript
+
+The `kurbeScript` automates the setup and verification of a local Kubernetes cluster.
+
+#### Kubernetes Features
+
+- Automatic cluster startup with configurable resources
+- System requirement validation
+- Resource availability checks
+- Color-coded output for better readability
+- Detailed error handling and troubleshooting
+
+### Basic Usage
+
+```bash
+# Make the script executable
+chmod +x kurbeScript
+
+# Run with default settings:
+./kurbeScript
+
+# For help and available options:
+./kurbeScript --help
+```
+
+This will:
+
+- Start a Kubernetes cluster using Minikube (with default settings: driver=docker, cpus=2, memory=2000mb)
+- Verify the cluster is running
+- Show the pods in the cluster
+
+### Custom Configuration (Optional)
+
+You can customize the cluster configuration using command-line arguments:
+
+```bash
+# Example: Create cluster with custom resources
+./kurbeScript --driver docker --cpus 4 --memory 4096mb
+```
+
+Available options:
+
+- `--driver`: Container runtime (docker, virtualbox, podman, ssh)
+- `--cpus`: Number of CPUs to allocate (default: 2)
+- `--memory`: Memory to allocate (default: 2000mb)
+
+### Verifying the Setup
+
+After successful execution, the script will:
+
+1. Start the Minikube cluster
+2. Verify the cluster status
+3. Display running pods in all namespaces
+
+### Accessing the Cluster
+
+```bash
+# Open Kubernetes dashboard
+minikube dashboard
+
+# Get cluster info:
+kubectl cluster-info
+```
+
+### Troubleshooting
+
+Common issues and solutions:
+
+1. **Insufficient memory**:
+   - Reduce requested memory: `--memory 1500mb`
+   - Close other memory-intensive applications
+
+2. **Driver issues**:
+   - Try a different driver: `--driver virtualbox`, `--driver podman`, `--driver ssh`
+   - Ensure the selected driver is properly installed
+
+3. **Cluster startup failures**:
+
+    ```bash
+    # View detailed logs:
+    minikube logs
+
+    # Resetting the cluster
+    minikube delete
+    ./kurbeScript
+    ```
+
+### Notes
+
+- The script includes error checking and will provide troubleshooting tips if cluster startup fails.
+- By default, it uses the Docker driver. If you encounter issues, try switching to a different driver.
+- Ensure your system meets the resource requirements for the requested cluster configuration.
+
+---
+
 ## Manual Setup (Alternative)
 
 If you prefer to set up the development environment manually:
