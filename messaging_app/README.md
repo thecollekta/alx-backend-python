@@ -190,6 +190,492 @@ Common issues and solutions:
 
 ---
 
+## Kubernetes Deployment
+
+### Kubernetes Deployment (Prerequisites)
+
+- [Minikube](https://minikube.sigs.k8s.io/docs/start/) installed
+- [kubectl](https://kubernetes.io/docs/tasks/tools/) configured
+- Docker image built and pushed to registry
+
+### Deployment Files
+
+The project includes these Kubernetes configuration files:
+
+- `deployment.yaml`: Main app deployment with services and configs
+- `db-deployment.yaml`: PostgreSQL database configuration
+
+### Deployment Guide
+
+**Prerequisites**:
+
+- Docker installed
+- Minikube installed
+- kubectl installed
+- Docker Hub account (for registry access)
+
+1. Build and Push Docker Image
+
+    ```bash
+    # Navigate to project directory
+    cd messaging_app
+
+    # Build Docker image
+    docker build -t messaging-app:1.0.0 .
+
+    # Authenticate to Docker Hub
+    docker login
+
+    # Tag and push to registry
+    docker tag messaging-app:1.0.0 <your-dockerhub-username>/messaging-app:1.0.0
+    docker push <your-dockerhub-username>/messaging-app:1.0.0
+    ```
+
+2. Prepare Kubernetes Environment
+
+    ```bash
+    # Start Minikube cluster
+    minikube start
+
+    # Enable registry addon
+    minikube addons enable registry
+
+    # Set up Docker environment
+    eval $(minikube docker-env)
+    ```
+
+3. Deploy Database (PostgreSQL)
+Create db-deployment.yaml:
+
+    ```bash
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+    name: postgres
+    spec:
+    replicas: 1
+    selector:
+        matchLabels:
+        app: postgres
+    template:
+        metadata:
+        labels:
+            app: postgres
+        spec:
+        containers:
+        - name: postgres
+            image: postgres:17
+            resources:
+            requests:
+                memory: "256Mi"
+                cpu: "250m"
+            limits:
+                memory: "512Mi"
+                cpu: "500m"
+            env:
+            - name: POSTGRES_DB
+            valueFrom:
+                secretKeyRef:
+                name: messaging-app-secrets
+                key: DB_NAME
+            - name: POSTGRES_USER
+            valueFrom:
+                secretKeyRef:
+                name: messaging-app-secrets
+                key: DB_USER
+            - name: POSTGRES_PASSWORD
+            valueFrom:
+                secretKeyRef:
+                name: messaging-app-secrets
+                key: DB_PASSWORD
+            ports:
+            - containerPort: 5432
+            volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+            name: postgres-data
+        volumes:
+        - name: postgres-data
+            persistentVolumeClaim:
+            claimName: postgres-pvc
+    ---
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+    name: postgres-pvc
+    spec:
+    accessModes:
+        - ReadWriteOnce
+    resources:
+        requests:
+        storage: 1Gi
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+    name: db-service
+    spec:
+    selector:
+        app: postgres
+    ports:
+        - protocol: TCP
+        port: 5432
+        targetPort: 5432
+    ```
+
+    Apply database configuration:
+
+    ```bash
+    kubectl apply -f db-deployment.yaml
+    ```
+
+4. Deploy Django Application
+
+    ```bash
+    # Update image reference in deployment.yaml
+    sed -i 's|localhost:5000/messaging-app:1.0.0|<your-dockerhub-username>/messaging-app:1.0.0|' deployment.yaml
+
+    # Apply Kubernetes configuration
+    kubectl apply -f deployment.yaml
+
+    # Verify deployment
+    kubectl get pods --watch
+    kubectl get all
+    kubectl logs -f deployment/messaging-app
+    ```
+
+5. Access the Application
+
+    ```bash
+    # Port forward to access service
+    kubectl port-forward svc/messaging-app-service 8000:8000
+
+    # Access in browser: http://localhost:8000
+
+    # Check application logs
+    kubectl logs -f deployment/messaging-app -c messaging-app
+    ```
+
+6. Verify Functionality
+
+    ```bash
+    # Check health endpoint
+    curl http://localhost:8000/api/v1/health/
+
+    # Check running pods
+    kubectl get pods
+
+    # Check service status
+    kubectl get svc
+
+    # View Kubernetes dashboard
+    minikube dashboard
+    ```
+
+7. Test Scaling
+
+    ```bash
+    # Scale deployment
+    kubectl scale deployment messaging-app --replicas=3
+
+    # Verify pod distribution
+    kubectl get pods -o wide
+    ```
+
+8. Perform Rolling Update
+
+    ```bash
+    # Update to new version
+    kubectl set image deployment/messaging-app messaging-app=<your-dockerhub-username>/messaging-app:1.1.0
+
+    # Monitor rollout status
+    kubectl rollout status deployment/messaging-app
+    ```
+
+9. Cleanup
+
+    ```bash
+    # Delete deployment
+    kubectl delete -f deployment.yaml
+    kubectl delete -f db-deployment.yaml
+
+    # Stop Minikube
+    minikube stop
+
+    # Delete cluster
+    minikube delete
+    ```
+
+### Key Components
+
+- Deployment: 2 replicas with rolling updates
+- Service: ClusterIP for internal access
+- ConfigMap: Non-sensitive configuration
+- Secret: Sensitive credentials (use proper management in production)
+- Database: PostgreSQL with persistent storage
+- Health Checks: Liveness and readiness probes
+
+---
+
+## Kubernetes Deployment Guide
+
+### Prerequisites
+
+- Kubernetes cluster (Minikube, Docker Desktop, or cloud provider)
+- `kubectl` command-line tool
+- Docker image of the application pushed to a container registry
+- `envsubst` utility (usually comes with `gettext` package)
+
+### Environment Variables
+
+Create a `.env` file with the following variables:
+
+```bash
+# Database Configuration
+DB_NAME=messaging_db
+DB_USER=messaging_user
+DB_PASSWORD=your_secure_password
+POSTGRES_PASSWORD=your_secure_password
+
+# Django Settings
+DJANGO_SECRET_KEY=your_secret_key
+DJANGO_DEBUG=false
+DJANGO_ALLOWED_HOSTS=*
+
+# Database URL (auto-generated)
+DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+```
+
+### Deployment Steps
+
+1. **Create Kubernetes Secrets**
+
+   ```bash
+   # Create namespace
+   kubectl create namespace messaging
+   
+   # Create secrets from .env file
+   kubectl create secret generic messaging-app-secrets \
+     --from-env-file=.env \
+     --namespace=messaging
+   ```
+
+2. **Apply Database Configuration**
+
+   ```bash
+   # Create persistent volumes and claims
+   kubectl apply -f k8s/db-storage.yaml -n messaging
+   
+   # Deploy PostgreSQL
+   kubectl apply -f k8s/db-deployment.yaml -n messaging
+   ```
+
+3. **Deploy the Application**
+
+   ```bash
+   # Apply the deployment
+   kubectl apply -f k8s/deployment.yaml -n messaging
+   
+   # Verify the deployment
+   kubectl get pods -n messaging
+   ```
+
+4. **Access the Application**
+
+   ```bash
+   # Port-forward to access the service
+   kubectl port-forward svc/messaging-app-service 8000:8000 -n messaging
+   ```
+
+   The application will be available at: <http://localhost:8000>
+
+### Monitoring and Logs
+
+```bash
+# View application logs
+kubectl logs -l app=messaging-app -n messaging --tail=50 -f
+
+# Monitor resource usage
+kubectl top pods -n messaging
+
+# Check pod status
+kubectl get pods -n messaging
+
+# View service details
+kubectl describe svc messaging-app-service -n messaging
+```
+
+### Scaling the Application
+
+```bash
+# Scale up
+kubectl scale deployment messaging-app --replicas=3 -n messaging
+
+# Scale down
+kubectl scale deployment messaging-app --replicas=1 -n messaging
+```
+
+### Database Management
+
+#### Run Migrations
+
+```bash
+kubectl exec -it $(kubectl get pods -n messaging -l app=messaging-app -o jsonpath='{.items[0].metadata.name}') -n messaging -- python manage.py migrate
+```
+
+#### Create Superuser
+
+```bash
+kubectl exec -it $(kubectl get pods -n messaging -l app=messaging-app -o jsonpath='{.items[0].metadata.name}') -n messaging -- python manage.py createsuperuser
+```
+
+### Backup and Restore
+
+#### Regular Backups
+
+```bash
+# Create a daily backup job
+kubectl create cronjob --image=postgres:14 --scheme="0 0 * * *" -- \
+  /bin/sh -c "PGPASSWORD=$POSTGRES_PASSWORD pg_dump -h postgres -U $POSTGRES_USER $DB_NAME | gzip > /backup/db-$(date +%Y%m%d).sql.gz"
+```
+
+#### Restore from Backup
+
+```bash
+# Find the backup file
+kubectl exec -it <postgres-pod> -- ls -la /backup/
+
+# Restore the database
+kubectl exec -i <postgres-pod> -- gunzip -c /backup/db-20230812.sql.gz | \
+  kubectl exec -i <postgres-pod> -- psql -U $POSTGRES_USER $DB_NAME
+```
+
+### Performance Tuning
+
+#### Database Tuning
+
+- Adjust PostgreSQL configuration in the StatefulSet
+- Configure connection pooling (e.g., PgBouncer)
+- Add read replicas for read-heavy workloads
+
+#### Application Tuning
+
+- Configure Django's cache backend
+- Use a CDN for static files
+- Enable GZIP compression
+- Optimize database queries
+
+### Security Hardening
+
+1. **Network Policies**
+   - Restrict ingress/egress traffic
+   - Only allow necessary ports and protocols
+
+2. **Pod Security Policies**
+   - Enable Pod Security Admission
+   - Restrict privileged containers
+   - Enforce read-only root filesystem
+
+3. **RBAC**
+   - Use minimal required permissions
+   - Create dedicated service accounts
+   - Avoid using cluster-admin
+
+### Scaling the Infrastructure
+
+#### Horizontal Pod Autoscaler (HPA)
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: messaging-app-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: messaging-app
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+```
+
+#### Cluster Autoscaler
+
+- Configure your cluster autoscaler to automatically add nodes when needed
+- Set appropriate resource requests and limits
+- Use node selectors and taints for workload placement
+
+### Security Considerations
+
+1. **Secrets Management**
+   - Never commit `.env` files to version control
+   - Use Kubernetes secrets or external secret management systems
+   - Rotate secrets regularly
+
+2. **Network Security**
+   - Network policies restrict traffic between pods
+   - Use internal services (ClusterIP) for internal communication
+   - Expose only necessary ports
+
+3. **Pod Security**
+   - Run containers as non-root users
+   - Use read-only root filesystem where possible
+   - Drop all capabilities not explicitly required
+
+### Monitoring and Alerting
+
+#### Prometheus Metrics
+
+Metrics are exposed on the `/metrics` endpoint. To set up monitoring:
+
+1. Install Prometheus and Grafana
+2. Configure Prometheus to scrape the metrics endpoint
+3. Import the Django dashboard for Grafana
+
+#### Logging
+
+Logs are sent to stdout and can be collected using a log aggregation system like:
+
+- ELK Stack (Elasticsearch, Logstash, Kibana)
+- Fluentd
+- Loki with Grafana
+
+### High Availability
+
+- The application is deployed with multiple replicas
+- Pod anti-affinity ensures pods are scheduled on different nodes
+- Database persistence ensures data survives pod restarts
+- Liveness and readiness probes ensure traffic is only sent to healthy pods
+
+### Backup and Disaster Recovery
+
+#### Regular Backups
+
+```bash
+# Create a daily backup job
+kubectl create cronjob --image=postgres:14 --scheme="0 0 * * *" -- \
+  /bin/sh -c "PGPASSWORD=$POSTGRES_PASSWORD pg_dump -h postgres -U $POSTGRES_USER $DB_NAME | gzip > /backup/db-$(date +%Y%m%d).sql.gz"
+```
+
+#### Restore from Backup
+
+```bash
+# Find the backup file
+kubectl exec -it <postgres-pod> -- ls -la /backup/
+
+# Restore the database
+kubectl exec -i <postgres-pod> -- gunzip -c /backup/db-20230812.sql.gz | \
+  kubectl exec -i <postgres-pod> -- psql -U $POSTGRES_USER $DB_NAME
+```
+
+---
+
 ## Manual Setup (Alternative)
 
 If you prefer to set up the development environment manually:
