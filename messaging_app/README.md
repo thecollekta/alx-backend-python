@@ -376,7 +376,7 @@ To expose your Django application to the internet using an Ingress controller, f
 minikube addons enable ingress
 
 # For production clusters
-kubectl apply -f https://github.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
 ```
 
 #### 2. Configure Ingress Resource
