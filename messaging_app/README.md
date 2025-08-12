@@ -28,6 +28,14 @@ A Django REST API for messaging functionality with JWT authentication, conversat
     - [Production Deployment](#production-deployment)
       - [1. Prepare Configuration](#1-prepare-configuration)
       - [2. Deploy to Cluster](#2-deploy-to-cluster)
+    - [Setting Up Ingress for External Access](#setting-up-ingress-for-external-access)
+      - [1. Install Nginx Ingress Controller](#1-install-nginx-ingress-controller)
+      - [2. Configure Ingress Resource](#2-configure-ingress-resource)
+      - [3. Apply the Ingress Configuration](#3-apply-the-ingress-configuration)
+      - [4. Configure Local DNS (for Development)](#4-configure-local-dns-for-development)
+      - [5. Access the Application](#5-access-the-application)
+    - [Production Considerations](#production-considerations)
+    - [Troubleshooting Ingress](#troubleshooting-ingress)
     - [Scaling and Management](#scaling-and-management)
       - [Using kubectl-0x01 Script](#using-kubectl-0x01-script)
       - [Manual Scaling](#manual-scaling)
@@ -355,6 +363,113 @@ helm install prometheus prometheus-community/kube-prometheus-stack --namespace m
 
 # Verify all components are running
 kubectl get all --all-namespaces
+```
+
+### Setting Up Ingress for External Access
+
+To expose your Django application to the internet using an Ingress controller, follow these steps:
+
+#### 1. Install Nginx Ingress Controller
+
+```bash
+# For Minikube (local development)
+minikube addons enable ingress
+
+# For production clusters
+kubectl apply -f https://github.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+```
+
+#### 2. Configure Ingress Resource
+
+Create a file named `ingress.yaml` in the `k8s` directory with the following content:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: messaging-app-ingress
+  namespace: messaging
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: messaging-app.local
+    http:
+      paths:
+      - path: /api/?(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: messaging-app-service
+            port:
+              number: 8000
+      - path: /admin/?(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: messaging-app-service
+            port:
+              number: 8000
+      - path: /?(.*)
+        pathType: Prefix
+        backend:
+          service:
+            name: messaging-app-service
+            port:
+              number: 8000
+```
+
+#### 3. Apply the Ingress Configuration
+
+```bash
+# Apply the Ingress configuration
+kubectl apply -f k8s/ingress.yaml
+
+# Verify the Ingress is created
+kubectl get ingress -n messaging
+```
+
+#### 4. Configure Local DNS (for Development)
+
+For local development with Minikube, update your `/etc/hosts` file:
+
+```bash
+# Get Minikube IP
+minikube ip
+
+# Add to /etc/hosts (Linux/macOS)
+echo "$(minikube ip) messaging-app.local" | sudo tee -a /etc/hosts
+```
+
+#### 5. Access the Application
+
+After setting up the Ingress, you can access the application at:
+
+- Web interface: <http://messaging-app.local>
+- API: <http://messaging-app.local/api/>
+- Admin: <http://messaging-app.local/admin/>
+
+### Production Considerations
+
+1. **Custom Domain**: Replace `messaging-app.local` with your production domain.
+2. **TLS/HTTPS**: Add TLS certificates using cert-manager or your preferred certificate management solution.
+3. **Load Balancer**: In production, your cloud provider will provision a load balancer automatically.
+4. **Annotations**: Customize Nginx behavior using [annotations](https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/annotations/).
+
+### Troubleshooting Ingress
+
+```bash
+# Check Ingress status
+kubectl describe ingress messaging-app-ingress -n messaging
+
+# View Nginx controller logs
+kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx --tail=50
+
+# Check if the Ingress controller is running
+kubectl get pods -n ingress-nginx
 ```
 
 ### Scaling and Management
