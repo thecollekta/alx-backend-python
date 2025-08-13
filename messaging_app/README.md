@@ -55,6 +55,16 @@ A Django REST API for messaging functionality with JWT authentication, conversat
     - [Deployment Files](#deployment-files)
     - [Best Practices](#best-practices)
     - [Troubleshooting Blue-Green Deployments](#troubleshooting-blue-green-deployments)
+  - [Rolling Updates with Zero Downtime](#rolling-updates-with-zero-downtime)
+    - [Key Features](#key-features)
+    - [Deployment Configuration](#deployment-configuration)
+    - [Using the Rolling Update Script](#using-the-rolling-update-script)
+    - [How It Works](#how-it-works-1)
+    - [Monitoring the Update](#monitoring-the-update)
+    - [Verifying the Update](#verifying-the-update)
+    - [Rollback Process](#rollback-process)
+    - [Best Practices](#best-practices-1)
+    - [Troubleshooting](#troubleshooting-1)
   - [Project Structure](#project-structure)
   - [API Documentation](#api-documentation)
     - [Authentication](#authentication)
@@ -69,9 +79,13 @@ A Django REST API for messaging functionality with JWT authentication, conversat
     - [Running Tests](#running-tests)
     - [Test Data](#test-data)
     - [API Testing with cURL](#api-testing-with-curl)
-- [Get JWT token](#get-jwt-token)
-- [List conversations](#list-conversations)
-- [Send a message](#send-a-message)
+    - [Using the Rolling Update Script](#using-the-rolling-update-script-1)
+    - [How It Works](#how-it-works-2)
+    - [Monitoring the Update](#monitoring-the-update-1)
+    - [Verifying the Update](#verifying-the-update-1)
+    - [Rollback Process](#rollback-process-1)
+    - [Best Practices](#best-practices-2)
+    - [Troubleshooting](#troubleshooting-2)
 
 ## Quick Start with Docker Compose
 
@@ -788,6 +802,157 @@ chmod +x kubectl-0x02
 
 For more information on blue-green deployments, refer to the [Kubernetes documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/).
 
+## Rolling Updates with Zero Downtime
+
+This project supports zero-downtime rolling updates using Kubernetes' built-in deployment strategies. The `kubectl-0x03` script automates the update process and verifies application health throughout the deployment.
+
+### Key Features
+
+- **Zero-downtime updates** - Maintains application availability during deployment
+- **Health monitoring** - Continuous verification of application health
+- **Automatic rollback** - On failure, the deployment automatically rolls back
+- **Progress tracking** - Real-time monitoring of the update process
+
+### Deployment Configuration
+
+The rolling update strategy is configured in `blue_deployment.yaml`:
+
+```yaml
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  minReadySeconds: 5
+```
+
+- **maxSurge: 1** - Allows one extra pod during the update
+- **maxUnavailable: 0** - Ensures full capacity during updates
+- **minReadySeconds: 5** - Gives pods time to warm up before receiving traffic
+
+### Using the Rolling Update Script
+
+The `kubectl-0x03` script automates the update process:
+
+```bash
+# Make the script executable
+chmod +x kubectl-0x03
+
+# Run the rolling update
+./kubectl-0x03
+```
+
+### How It Works
+
+1. **Starts Health Checks**
+   - Begins continuous health checks against the application
+   - Logs all requests for later analysis
+
+2. **Applies Updates**
+   - Updates the deployment with the new image version
+   - Uses Kubernetes' rolling update strategy
+   - Monitors the update progress
+
+3. **Verifies Deployment**
+   - Checks that all pods are running the new version
+   - Verifies service endpoints are updated
+   - Confirms application health
+
+### Monitoring the Update
+
+During the update, the script provides real-time feedback:
+
+- Green checkmarks (✓) for successful health checks
+- Red X's (✗) for failed health checks
+- Progress updates on the deployment status
+
+### Verifying the Update
+
+After the update completes, verify the deployment:
+
+```bash
+# Check deployment status
+kubectl get deployments -n messaging
+
+# View pods (should show new version)
+kubectl get pods -n messaging -l app=messaging-app
+
+# Check rollout history
+kubectl rollout history deployment/messaging-app-blue -n messaging
+
+# View detailed status
+kubectl describe deployment messaging-app-blue -n messaging
+```
+
+### Rollback Process
+
+If an update fails, Kubernetes automatically rolls back to the previous version. You can also manually rollback:
+
+```bash
+# View rollout history
+kubectl rollout history deployment/messaging-app-blue -n messaging
+
+# Rollback to previous version
+kubectl rollout undo deployment/messaging-app-blue -n messaging
+
+# Rollback to specific revision
+kubectl rollout undo deployment/messaging-app-blue -n messaging --to-revision=2
+```
+
+### Best Practices
+
+1. **Test Updates in Staging**
+   - Always test updates in a staging environment first
+   - Verify compatibility with the current database schema
+
+2. **Monitor During Updates**
+   - Keep an eye on application metrics
+   - Watch for increased error rates or performance issues
+
+3. **Set Resource Limits**
+   - Ensure pods have appropriate resource requests and limits
+   - Prevents resource starvation during updates
+
+4. **Use Readiness Probes**
+   - Configure proper readiness probes
+   - Ensures traffic only reaches healthy pods
+
+### Troubleshooting
+
+1. **Update Stalls**
+
+   ```bash
+   # Check deployment status
+   kubectl describe deployment messaging-app-blue -n messaging
+   
+   # Check pod events
+   kubectl get events -n messaging --sort-by='.metadata.creationTimestamp'
+   ```
+
+2. **Health Check Failures**
+
+   ```bash
+   # Check pod logs
+   kubectl logs -n messaging -l app=messaging-app --tail=50
+   
+   # Check pod status
+   kubectl get pods -n messaging -o wide
+   ```
+
+3. **Image Pull Issues**
+
+   ```bash
+   # Check pod status
+   kubectl describe pod -n messaging -l app=messaging-app
+   
+   # Check image pull secrets
+   kubectl get secrets -n messaging
+   ```
+
+For more information on rolling updates, refer to the [Kubernetes documentation](https://kubernetes.io/docs/tutorials/kubernetes-basics/update/update-intro/).
+
 ## Project Structure
 
 ```text
@@ -965,3 +1130,165 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"content": "Hello, this is a test message!"}'
+
+```
+
+Follow these instructions to make the following change to my code document.
+
+Instruction: Add a new section for Rolling Updates after the Blue-Green Deployment Strategy section
+
+Code Edit:
+
+```
+{{ ... }}
+## Rolling Updates with Zero Downtime
+
+This project supports zero-downtime rolling updates using Kubernetes' built-in deployment strategies. The `kubectl-0x03` script automates the update process and verifies application health throughout the deployment.
+
+### Key Features
+
+- **Zero-downtime updates** - Maintains application availability during deployment
+- **Health monitoring** - Continuous verification of application health
+- **Automatic rollback** - On failure, the deployment automatically rolls back
+- **Progress tracking** - Real-time monitoring of the update process
+
+### Deployment Configuration
+
+The rolling update strategy is configured in `blue_deployment.yaml`:
+
+```yaml
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  minReadySeconds: 5
+```
+
+- **maxSurge: 1** - Allows one extra pod during the update
+- **maxUnavailable: 0** - Ensures full capacity during updates
+- **minReadySeconds: 5** - Gives pods time to warm up before receiving traffic
+
+### Using the Rolling Update Script
+
+The `kubectl-0x03` script automates the update process:
+
+```bash
+# Make the script executable
+chmod +x kubectl-0x03
+
+# Run the rolling update
+./kubectl-0x03
+```
+
+### How It Works
+
+1. **Starts Health Checks**
+   - Begins continuous health checks against the application
+   - Logs all requests for later analysis
+
+2. **Applies Updates**
+   - Updates the deployment with the new image version
+   - Uses Kubernetes' rolling update strategy
+   - Monitors the update progress
+
+3. **Verifies Deployment**
+   - Checks that all pods are running the new version
+   - Verifies service endpoints are updated
+   - Confirms application health
+
+### Monitoring the Update
+
+During the update, the script provides real-time feedback:
+
+- Green checkmarks (✓) for successful health checks
+- Red X's (✗) for failed health checks
+- Progress updates on the deployment status
+
+### Verifying the Update
+
+After the update completes, verify the deployment:
+
+```bash
+# Check deployment status
+kubectl get deployments -n messaging
+
+# View pods (should show new version)
+kubectl get pods -n messaging -l app=messaging-app
+
+# Check rollout history
+kubectl rollout history deployment/messaging-app-blue -n messaging
+
+# View detailed status
+kubectl describe deployment messaging-app-blue -n messaging
+```
+
+### Rollback Process
+
+If an update fails, Kubernetes automatically rolls back to the previous version. You can also manually rollback:
+
+```bash
+# View rollout history
+kubectl rollout history deployment/messaging-app-blue -n messaging
+
+# Rollback to previous version
+kubectl rollout undo deployment/messaging-app-blue -n messaging
+
+# Rollback to specific revision
+kubectl rollout undo deployment/messaging-app-blue -n messaging --to-revision=2
+```
+
+### Best Practices
+
+1. **Test Updates in Staging**
+   - Always test updates in a staging environment first
+   - Verify compatibility with the current database schema
+
+2. **Monitor During Updates**
+   - Keep an eye on application metrics
+   - Watch for increased error rates or performance issues
+
+3. **Set Resource Limits**
+   - Ensure pods have appropriate resource requests and limits
+   - Prevents resource starvation during updates
+
+4. **Use Readiness Probes**
+   - Configure proper readiness probes
+   - Ensures traffic only reaches healthy pods
+
+### Troubleshooting
+
+1. **Update Stalls**
+
+   ```bash
+   # Check deployment status
+   kubectl describe deployment messaging-app-blue -n messaging
+   
+   # Check pod events
+   kubectl get events -n messaging --sort-by='.metadata.creationTimestamp'
+   ```
+
+2. **Health Check Failures**
+
+   ```bash
+   # Check pod logs
+   kubectl logs -n messaging -l app=messaging-app --tail=50
+   
+   # Check pod status
+   kubectl get pods -n messaging -o wide
+   ```
+
+3. **Image Pull Issues**
+
+   ```bash
+   # Check pod status
+   kubectl describe pod -n messaging -l app=messaging-app
+   
+   # Check image pull secrets
+   kubectl get secrets -n messaging
+   ```
+
+For more information on rolling updates, refer to the [Kubernetes documentation](https://kubernetes.io/docs/tutorials/kubernetes-basics/update/update-intro/).
+

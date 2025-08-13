@@ -47,7 +47,7 @@ spec:
               topologyKey: "kubernetes.io/hostname"
       containers:
       - name: messaging-app
-        image: collekta/messaging-app:1.0.0
+        image: collekta/messaging-app:2.0.0
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
