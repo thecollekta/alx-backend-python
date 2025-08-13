@@ -23,3 +23,21 @@ minikube ip
 
 # Add to /etc/hosts
 # <minikube-ip> messaging-app.local
+
+# Apply blue deployment
+kubectl apply -f blue_deployment.yaml
+
+# Apply service
+kubectl apply -f kubeservice.yaml
+
+# Deploy green version
+./kubctl-0x02 deploy green
+
+# Verify green version
+./kubctl-0x02 verify green
+
+# Switch traffic to green
+./kubctl-0x02 switch green
+
+# Rollback to blue if needed
+./kubctl-0x02 rollback

@@ -48,6 +48,13 @@ A Django REST API for messaging functionality with JWT authentication, conversat
     - [Troubleshooting](#troubleshooting)
       - [Common Issues](#common-issues)
     - [Cleanup](#cleanup)
+  - [Blue-Green Deployment Strategy](#blue-green-deployment-strategy)
+    - [Key Components](#key-components)
+    - [How It Works](#how-it-works)
+    - [Using the Deployment Controller](#using-the-deployment-controller)
+    - [Deployment Files](#deployment-files)
+    - [Best Practices](#best-practices)
+    - [Troubleshooting Blue-Green Deployments](#troubleshooting-blue-green-deployments)
   - [Project Structure](#project-structure)
   - [API Documentation](#api-documentation)
     - [Authentication](#authentication)
@@ -62,10 +69,9 @@ A Django REST API for messaging functionality with JWT authentication, conversat
     - [Running Tests](#running-tests)
     - [Test Data](#test-data)
     - [API Testing with cURL](#api-testing-with-curl)
-  - [License](#license)
-  - [Additional Resources](#additional-resources)
-  - [Support](#support)
-  - [Contributing](#contributing)
+- [Get JWT token](#get-jwt-token)
+- [List conversations](#list-conversations)
+- [Send a message](#send-a-message)
 
 ## Quick Start with Docker Compose
 
@@ -692,6 +698,96 @@ minikube stop
 minikube delete
 ```
 
+## Blue-Green Deployment Strategy
+
+This project implements a blue-green deployment strategy to ensure zero-downtime deployments. The strategy maintains two identical production environments (blue and green) where only one environment is live at any given time.
+
+### Key Components
+
+1. **Blue Deployment** (`blue_deployment.yaml`): The current production version
+2. **Green Deployment** (`green_deployment.yaml`): The new version being deployed
+3. **Service** (`kubeservice.yaml`): Routes traffic to the active deployment
+4. **Deployment Controller** (`kubectl-0x02`): Manages the deployment process
+
+### How It Works
+
+1. **Current State**: Traffic is routed to the blue environment
+2. **Deploy New Version**: Deploy the new version to the green environment
+3. **Test**: Verify the new version works correctly
+4. **Switch Traffic**: Update the service to point to the green environment
+5. **Rollback (if needed)**: Switch back to blue if issues are detected
+
+### Using the Deployment Controller
+
+The `kubectl-0x02` script provides a simple interface for managing blue-green deployments:
+
+```bash
+# Make the script executable
+chmod +x kubectl-0x02
+
+# Show help
+./kubectl-0x02 --help
+
+# Deploy a new version (blue or green)
+./kubectl-0x02 deploy green
+
+# Verify the deployment
+./kubectl-0x02 verify green
+
+# Switch traffic to the new version
+./kubectl-0x02 switch green
+
+# Rollback to blue version if needed
+./kubectl-0x02 rollback
+```
+
+### Deployment Files
+
+1. **Blue Deployment** (`k8s/blue_deployment.yaml`):
+   - Deploys the current stable version
+   - Labeled with `version: blue`
+   - Configured with appropriate resource limits and health checks
+
+2. **Green Deployment** (`k8s/green_deployment.yaml`):
+   - Deploys the new version being tested
+   - Labeled with `version: green`
+   - Identical configuration to blue deployment except for version tags
+
+3. **Service** (`k8s/kubeservice.yaml`):
+   - Routes traffic to the active deployment
+   - Uses label selectors to determine active version
+   - Can be updated to switch between blue and green
+
+### Best Practices
+
+1. **Testing**: Always verify the new deployment before switching traffic
+2. **Rollback**: Keep the previous version running until the new version is verified
+3. **Monitoring**: Monitor application metrics during and after the switch
+4. **Documentation**: Update deployment documentation with each release
+5. **Backup**: Ensure database backups are current before deployment
+
+### Troubleshooting Blue-Green Deployments
+
+1. **Deployment Fails**
+   - Check pod logs: `kubectl logs -n messaging -l version=green`
+   - Verify resource limits and requests
+   - Check for configuration errors
+
+2. **Service Not Updating**
+   - Verify service selector matches deployment labels
+   - Check service endpoints: `kubectl get endpoints -n messaging`
+
+3. **Rollback Issues**
+   - Previous version should remain running
+   - Verify blue deployment is still healthy before switching back
+
+4. **Performance Issues**
+   - Check resource usage: `kubectl top pods -n messaging`
+   - Verify database connection pool settings
+   - Monitor application metrics
+
+For more information on blue-green deployments, refer to the [Kubernetes documentation](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/).
+
 ## Project Structure
 
 ```text
@@ -869,28 +965,3 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"content": "Hello, this is a test message!"}'
-```
-
-## License
-
-This project is licensed under the ALX ProDEV Curriculum.
-
-## Additional Resources
-
-- [Django Documentation](https://docs.djangoproject.com/)
-- [Django REST Framework Documentation](https://www.django-rest-framework.org/)
-- [Kubernetes Documentation](https://kubernetes.io/docs/home/)
-- [Docker Documentation](https://docs.docker.com/)
-- [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-
-## Support
-
-For support, please open an issue in the GitHub repository or contact the development team.
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
