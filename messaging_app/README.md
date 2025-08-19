@@ -86,11 +86,13 @@ A Django REST API for messaging functionality with JWT authentication, conversat
     - [Manual Triggers and Visibility](#manual-triggers-and-visibility)
     - [Operational Notes](#operational-notes)
     - [Troubleshooting CI (Conceptual)](#troubleshooting-ci-conceptual)
-  - [CI: GitHub Actions Testing Workflow](#ci-github-actions-testing-workflow)
-    - [Prerequisites (Conceptual)](#prerequisites-conceptual-1)
-    - [Pipeline Flow (High-Level)](#pipeline-flow-high-level-1)
-    - [Operational Notes](#operational-notes-1)
-    - [Troubleshooting](#troubleshooting-2)
+  - [GitHub Actions: Testing, Linting, and Coverage](#github-actions-testing-linting-and-coverage)
+    - [Workflow Location and Triggers](#workflow-location-and-triggers)
+    - [Services: MySQL for Tests](#services-mysql-for-tests)
+    - [Job Flow (High-Level)](#job-flow-high-level)
+    - [Linting with flake8](#linting-with-flake8)
+    - [Coverage Reports and Artifacts](#coverage-reports-and-artifacts)
+    - [Operational Notes and Troubleshooting](#operational-notes-and-troubleshooting)
 
 ## Quick Start with Docker Compose
 
@@ -1135,7 +1137,6 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"content": "Hello, this is a test message!"}'
-
 ```
 
 ## CI/CD: Jenkins and Docker Hub
@@ -1154,7 +1155,7 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
 ### Pipeline Flow (High-Level)
 
 - **Checkout**: Pulls repository using the configured GitHub credentials.
-- **Python environment**: Creates an isolated environment aligned with the app’s Python version; installs application and test dependencies defined in `requirements.txt` (and/or dev requirements if used).
+- **Python environment**: Creates an isolated environment aligned with the app's Python version; installs application and test dependencies defined in `requirements.txt` (and/or dev requirements if used).
 - **Tests**: Executes the test suite with JUnit-style results. Results are published in Jenkins for visibility and trends.
 - **Docker build**: Builds the application image using `messaging_app/Dockerfile` with the build context set to the `messaging_app/` directory to ensure file paths match COPY directives.
 - **Tagging**: Produces a moving tag (e.g., latest) and an immutable tag (e.g., short commit SHA) for traceability.
@@ -1185,39 +1186,45 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
 - **Incorrect script path**: If the job cannot find the pipeline definition, verify the Script Path matches the nested Jenkinsfile.
 - **Push failures**: Confirm Docker Hub credentials are present and the target repository namespace is correct.
 
-## CI: GitHub Actions Testing Workflow
+## GitHub Actions: Testing, Linting, and Coverage
 
-- **Location**: Workflow file at repo root: `.github/workflows/ci.yml`.
-- **Scope**: Run Django tests on every push and pull request, using a MySQL service container.
+- **Scope**: Automates Django test execution, Python linting with flake8, and coverage reporting on pushes and pull requests.
+- **Workflow as Code**: The workflow is defined at `.github/workflows/ci.yml` (repository root). Steps operate from the `messaging_app/` working directory to align with project files.
 
-### Prerequisites (Conceptual)
+### Workflow Location and Triggers
 
-- **GitHub Actions**: GitHub repository with Actions enabled.
-- **Docker**: Docker CLI access for building and pushing images.
-- **MySQL**: MySQL service container for testing.
+- **Location**: `.github/workflows/ci.yml` at the repository root (required by GitHub Actions).
+- **Triggers**: Runs on `push` and `pull_request`. Optionally restrict to changes under `messaging_app/**` for focused builds.
 
-### Pipeline Flow (High-Level)
+### Services: MySQL for Tests
 
-- **Checkout**: Fetch repository contents.
-- **Python**: Set up a Python version compatible with the app (align with `python:3.10` base used in `messaging_app/Dockerfile`).
-- **Cache (optional)**: Cache pip to speed up subsequent runs.
-- **Install dependencies**: Install application deps from `messaging_app/requirements.txt` and test tools (e.g., pytest/coverage) if not already included.
-- **MySQL service**: Provision a MySQL service with environment variables mirroring `docker-compose.yml` (database, user, passwords). Ensure the service is healthy before tests run.
-- **Environment for tests**: Provide Django with DB variables (`DB_ENGINE=mysql`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST=127.0.0.1`, `DB_PORT=3306`, plus `SECRET_KEY`, `DEBUG=False`). Ensure names match what `messaging_app/messaging_app/settings.py` expects.
-- **Migrations**: Apply database migrations prior to executing tests.
-- **Tests**: Run the test suite (pytest or Django’s test runner) from the `messaging_app/` working directory, producing JUnit XML (and optional coverage reports).
-- **Artifacts**: Upload test reports and coverage outputs for inspection in the Actions run.
+- **MySQL service**: A MySQL container is provisioned for tests via Actions services.
+- **Environment**: Database name, user, and passwords are set via step or job environment variables to match Django settings expectations.
+- **Health**: The job waits for MySQL readiness before migrations/tests to avoid flakiness.
 
-### Operational Notes
+### Job Flow (High-Level)
 
-- **Working directory**: Use `working-directory: messaging_app` on steps that install dependencies and run tests.
-- **Service networking**: In GitHub Actions, services expose ports to the job container; use `127.0.0.1:3306` for `DB_HOST` unless you explicitly network differently.
-- **Secrets**: Prefer GitHub Secrets for sensitive values (e.g., database passwords in CI); avoid plain text in workflow YAML. Reference via `${{ secrets.NAME }}`.
-- **Consistency**: Keep environment variable names consistent with your compose file (`docker-compose.yml`) or map them decisively in settings.
+- **Checkout**: Retrieves the repository.
+- **Python setup**: Installs a compatible Python version (e.g., 3.10) and caches pip downloads to speed subsequent runs.
+- **Dependencies**: Installs runtime and test dependencies from `messaging_app/requirements.txt` (and dev requirements if used) including `pytest`, `pytest-cov`, and `flake8`.
+- **Migrations**: Applies Django migrations against the MySQL service.
+- **Lint**: Runs flake8 over the Django codebase; any violations cause the job to fail.
+- **Tests + coverage**: Executes tests with coverage enabled; produces JUnit-style test results and coverage output.
 
-### Troubleshooting
+### Linting with flake8
 
-- **DB readiness**: If tests fail to connect, add a simple wait strategy (health check/wait-for-db) before migrations/tests.
-- **Missing test tools**: Ensure pytest and related packages are installed; otherwise, the test step will fail early.
-- **Incorrect paths**: Confirm the workflow lives at `.github/workflows/ci.yml` and that steps operate within `messaging_app/`.
-- **Flaky tests**: Stabilize by isolating external I/O and controlling time-based logic.
+- **Failure on errors**: The build fails automatically if flake8 reports violations.
+- **Configuration**: Rules and ignores should be centralized in `setup.cfg` or `pyproject.toml` for consistency between local and CI runs.
+
+### Coverage Reports and Artifacts
+
+- **Outputs**: Generate coverage in XML (e.g., `coverage.xml`) and HTML (e.g., under `reports/coverage_html/`).
+- **Artifacts**: Upload JUnit test results and coverage artifacts so they are available from the Actions run.
+- **Thresholds**: Optionally enforce a minimum coverage threshold to fail the job on regressions.
+
+### Operational Notes and Troubleshooting
+
+- **Working directory**: Most steps run from `messaging_app/` so paths like `manage.py` and `requirements.txt` resolve correctly.
+- **Secrets**: Use GitHub Secrets for any sensitive values (e.g., DB passwords) instead of committing them.
+- **Test stability**: If MySQL setup is slow or flaky, consider starting with SQLite-backed unit tests and introduce MySQL for integration tests once stable.
+- **Performance**: Use pip caching; keep dependencies pinned for reproducible outcomes.
