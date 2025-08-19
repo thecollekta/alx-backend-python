@@ -93,6 +93,12 @@ A Django REST API for messaging functionality with JWT authentication, conversat
     - [Linting with flake8](#linting-with-flake8)
     - [Coverage Reports and Artifacts](#coverage-reports-and-artifacts)
     - [Operational Notes and Troubleshooting](#operational-notes-and-troubleshooting)
+  - [CI/CD: GitHub Actions – Docker Build \& Push](#cicd-github-actions--docker-build--push)
+    - [Prerequisites (Conceptual)](#prerequisites-conceptual-1)
+    - [Workflow Flow (High-Level)](#workflow-flow-high-level)
+    - [Operational Notes](#operational-notes-1)
+    - [Security and Compliance](#security-and-compliance)
+    - [Troubleshooting (Conceptual)](#troubleshooting-conceptual)
 
 ## Quick Start with Docker Compose
 
@@ -1165,7 +1171,7 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
 ### Image Naming and Tagging (Guidance)
 
 - **Registry**: `docker.io/<namespace>/<repository>`.
-- **Tags**: Use both a stable tag (e.g., latest or branch name) and a provenance tag (e.g., commit SHA) to support rollbacks and audits.
+- **Tags**: Use both a stable tag (e.g., latest or branch name) and a unique tag (e.g., commit SHA or release version) to enable traceability and rollbacks.
 
 ### Manual Triggers and Visibility
 
@@ -1177,7 +1183,8 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
 - **Jenkinsfile location**: Ensure the job's "Script Path" points to `messaging_app/messaging_app/Jenkinsfile` due to the nested location within this repository.
 - **Build context**: The Docker build must use `messaging_app/` as the context so that `COPY` statements in `messaging_app/Dockerfile` resolve paths correctly.
 - **Secrets hygiene**: Use Jenkins Credentials; do not hardcode tokens, passwords, or registry credentials in the repository or in pipeline logs.
-- **.dockerignore**: Keep the context lean by excluding virtual environments, caches, VCS metadata, local databases, and other non-essential files.
+- **Test stability**: If MySQL setup is slow or flaky, consider starting with SQLite-backed unit tests and introduce MySQL for integration tests once stable.
+- **Performance**: Use pip caching; keep dependencies pinned for reproducible outcomes.
 
 ### Troubleshooting CI (Conceptual)
 
@@ -1228,3 +1235,42 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
 - **Secrets**: Use GitHub Secrets for any sensitive values (e.g., DB passwords) instead of committing them.
 - **Test stability**: If MySQL setup is slow or flaky, consider starting with SQLite-backed unit tests and introduce MySQL for integration tests once stable.
 - **Performance**: Use pip caching; keep dependencies pinned for reproducible outcomes.
+
+## CI/CD: GitHub Actions – Docker Build & Push
+
+- **Scope**: Automates building and publishing the application Docker image to Docker Hub using GitHub Actions.
+- **Workflow as Code**: The workflow file resides at `.github/workflows/dep.yml` (repository root). The build context is `messaging_app/` and the Dockerfile path is `messaging_app/Dockerfile`.
+
+### Prerequisites (Conceptual)
+
+- **GitHub Secrets**:
+  - `DOCKERHUB_USERNAME`: Your Docker Hub namespace/username.
+  - `DOCKERHUB_TOKEN`: Docker Hub access token for non-interactive login (preferred over password).
+- **Repository layout**: Ensure `.dockerignore` excludes non-essential files (e.g., VCS metadata, virtual envs, caches, local DBs) to keep builds fast and images small.
+
+### Workflow Flow (High-Level)
+
+- **Triggers**: Runs on selected branches/tags (e.g., main, release tags). Pull requests may build without pushing.
+- **Login**: Authenticates to Docker Hub using GitHub Secrets; credentials are masked in logs.
+- **Build**: Uses `messaging_app/` as the build context and `messaging_app/Dockerfile` to create the image.
+- **Tagging**: Produces a stable tag (e.g., `latest` or branch) and an immutable provenance tag (e.g., short commit SHA or release tag).
+- **Push**: Publishes the tagged images to `docker.io/<DOCKERHUB_USERNAME>/<repository>`.
+
+### Operational Notes
+
+- **Workflow location**: GitHub Actions only executes workflows located under `.github/workflows/` at the repository root. Keep the workflow as `.github/workflows/dep.yml` even though the application sources live in `messaging_app/`.
+- **Build context correctness**: Building from `messaging_app/` ensures `COPY` statements in `messaging_app/Dockerfile` resolve correctly.
+- **Tag strategy**: Use both a moving tag (e.g., `latest`) and a unique tag (e.g., commit SHA or release version) to enable traceability and rollbacks.
+
+### Security and Compliance
+
+- **Least privilege**: Use a Docker Hub access token limited to required scope; rotate regularly.
+- **Secret handling**: Never echo secrets in logs or store them in the repository. Reference them via GitHub Actions secrets.
+- **Reproducibility**: Pin base images and Python dependencies to avoid unexpected breaks.
+
+### Troubleshooting (Conceptual)
+
+- **Workflow not triggering**: Verify the workflow file is at `.github/workflows/dep.yml` and matches trigger conditions.
+- **Build fails on context**: Confirm the build context is `messaging_app/` and the Dockerfile path is `messaging_app/Dockerfile`.
+- **Push failures**: Ensure Docker Hub repository exists and credentials are valid; confirm image tags and repository namespace are correct.
+- **Large images**: Review `.dockerignore` and dependencies to reduce image size and build time.
