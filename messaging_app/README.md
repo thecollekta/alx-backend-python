@@ -86,6 +86,11 @@ A Django REST API for messaging functionality with JWT authentication, conversat
     - [Manual Triggers and Visibility](#manual-triggers-and-visibility)
     - [Operational Notes](#operational-notes)
     - [Troubleshooting CI (Conceptual)](#troubleshooting-ci-conceptual)
+  - [CI: GitHub Actions Testing Workflow](#ci-github-actions-testing-workflow)
+    - [Prerequisites (Conceptual)](#prerequisites-conceptual-1)
+    - [Pipeline Flow (High-Level)](#pipeline-flow-high-level-1)
+    - [Operational Notes](#operational-notes-1)
+    - [Troubleshooting](#troubleshooting-2)
 
 ## Quick Start with Docker Compose
 
@@ -1179,3 +1184,40 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
 - **Missing dev dependencies**: Ensure test tools are declared and installed; otherwise the test stage will fail before the build.
 - **Incorrect script path**: If the job cannot find the pipeline definition, verify the Script Path matches the nested Jenkinsfile.
 - **Push failures**: Confirm Docker Hub credentials are present and the target repository namespace is correct.
+
+## CI: GitHub Actions Testing Workflow
+
+- **Location**: Workflow file at repo root: `.github/workflows/ci.yml`.
+- **Scope**: Run Django tests on every push and pull request, using a MySQL service container.
+
+### Prerequisites (Conceptual)
+
+- **GitHub Actions**: GitHub repository with Actions enabled.
+- **Docker**: Docker CLI access for building and pushing images.
+- **MySQL**: MySQL service container for testing.
+
+### Pipeline Flow (High-Level)
+
+- **Checkout**: Fetch repository contents.
+- **Python**: Set up a Python version compatible with the app (align with `python:3.10` base used in `messaging_app/Dockerfile`).
+- **Cache (optional)**: Cache pip to speed up subsequent runs.
+- **Install dependencies**: Install application deps from `messaging_app/requirements.txt` and test tools (e.g., pytest/coverage) if not already included.
+- **MySQL service**: Provision a MySQL service with environment variables mirroring `docker-compose.yml` (database, user, passwords). Ensure the service is healthy before tests run.
+- **Environment for tests**: Provide Django with DB variables (`DB_ENGINE=mysql`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST=127.0.0.1`, `DB_PORT=3306`, plus `SECRET_KEY`, `DEBUG=False`). Ensure names match what `messaging_app/messaging_app/settings.py` expects.
+- **Migrations**: Apply database migrations prior to executing tests.
+- **Tests**: Run the test suite (pytest or Django’s test runner) from the `messaging_app/` working directory, producing JUnit XML (and optional coverage reports).
+- **Artifacts**: Upload test reports and coverage outputs for inspection in the Actions run.
+
+### Operational Notes
+
+- **Working directory**: Use `working-directory: messaging_app` on steps that install dependencies and run tests.
+- **Service networking**: In GitHub Actions, services expose ports to the job container; use `127.0.0.1:3306` for `DB_HOST` unless you explicitly network differently.
+- **Secrets**: Prefer GitHub Secrets for sensitive values (e.g., database passwords in CI); avoid plain text in workflow YAML. Reference via `${{ secrets.NAME }}`.
+- **Consistency**: Keep environment variable names consistent with your compose file (`docker-compose.yml`) or map them decisively in settings.
+
+### Troubleshooting
+
+- **DB readiness**: If tests fail to connect, add a simple wait strategy (health check/wait-for-db) before migrations/tests.
+- **Missing test tools**: Ensure pytest and related packages are installed; otherwise, the test step will fail early.
+- **Incorrect paths**: Confirm the workflow lives at `.github/workflows/ci.yml` and that steps operate within `messaging_app/`.
+- **Flaky tests**: Stabilize by isolating external I/O and controlling time-based logic.
