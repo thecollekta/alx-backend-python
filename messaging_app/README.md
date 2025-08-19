@@ -79,13 +79,13 @@ A Django REST API for messaging functionality with JWT authentication, conversat
     - [Running Tests](#running-tests)
     - [Test Data](#test-data)
     - [API Testing with cURL](#api-testing-with-curl)
-    - [Using the Rolling Update Script](#using-the-rolling-update-script-1)
-    - [How It Works](#how-it-works-2)
-    - [Monitoring the Update](#monitoring-the-update-1)
-    - [Verifying the Update](#verifying-the-update-1)
-    - [Rollback Process](#rollback-process-1)
-    - [Best Practices](#best-practices-2)
-    - [Troubleshooting](#troubleshooting-2)
+  - [CI/CD: Jenkins and Docker Hub](#cicd-jenkins-and-docker-hub)
+    - [Prerequisites (Conceptual)](#prerequisites-conceptual)
+    - [Pipeline Flow (High-Level)](#pipeline-flow-high-level)
+    - [Image Naming and Tagging (Guidance)](#image-naming-and-tagging-guidance)
+    - [Manual Triggers and Visibility](#manual-triggers-and-visibility)
+    - [Operational Notes](#operational-notes)
+    - [Troubleshooting CI (Conceptual)](#troubleshooting-ci-conceptual)
 
 ## Quick Start with Docker Compose
 
@@ -1133,65 +1133,49 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
 
 ```
 
-## CI/CD: Jenkins and GitHub Actions
+## CI/CD: Jenkins and Docker Hub
 
-This project implements Continuous Integration using Jenkins, with Pipeline-as-Code stored in the repository, and is designed to interoperate with GitHub Actions for additional checks.
+- **Scope**: Automates testing and container image delivery for the Django messaging app using Jenkins as CI and Docker Hub as the registry.
+- **Pipeline as Code**: The pipeline is defined at `messaging_app/messaging_app/Jenkinsfile`. The Docker build context and Dockerfile reside under `messaging_app/` (`messaging_app/Dockerfile`).
 
-- **Scope**: Automated test execution, code quality gates, and artifact/report publishing on each change.
-- **Source of truth**: Jenkins pipeline defined at `messaging_app/Jenkinsfile` in this repository.
+### Prerequisites (Conceptual)
 
-### Jenkins setup (conceptual)
+- **Jenkins**: Running instance with Pipeline and Git plugins; ShiningPanda (or equivalent) for Python environment management; JUnit plugin for test reports.
+- **Agent capabilities**: The Jenkins agent must have Docker CLI access to a Docker daemon. Ensure appropriate permissions and avoid exposing credentials in logs.
+- **Credentials**:
+  - **GitHub**: Personal Access Token stored in Jenkins Credentials for repository checkout.
+  - **Docker Hub**: Registry username/token stored in Jenkins Credentials for login and pushes.
 
-- **Runtime**: Jenkins LTS runs in a container with persistent storage for the Jenkins home directory and the web UI exposed locally.
-- **Initial configuration**: Admin unlock, suggested plugins installation, and creation of an administrator account.
-- **Plugins in use**:
-  - **Git**: Enables cloning from GitHub.
-  - **Pipeline**: Supports Jenkins Pipeline definitions from the repo.
-  - **ShiningPanda**: Manages Python toolchains and virtual environments for builds.
-  - **JUnit**: Publishes test results as build reports.
+### Pipeline Flow (High-Level)
 
-### Credentials and security
+- **Checkout**: Pulls repository using the configured GitHub credentials.
+- **Python environment**: Creates an isolated environment aligned with the app’s Python version; installs application and test dependencies defined in `requirements.txt` (and/or dev requirements if used).
+- **Tests**: Executes the test suite with JUnit-style results. Results are published in Jenkins for visibility and trends.
+- **Docker build**: Builds the application image using `messaging_app/Dockerfile` with the build context set to the `messaging_app/` directory to ensure file paths match COPY directives.
+- **Tagging**: Produces a moving tag (e.g., latest) and an immutable tag (e.g., short commit SHA) for traceability.
+- **Registry push**: Authenticates to Docker Hub using Jenkins credentials and pushes both tags.
+- **Artifacts**: Test reports and (optionally) coverage reports are archived for each build.
 
-- **GitHub access**: A Personal Access Token (least privilege) is stored in Jenkins Credentials and used by the checkout step.
-- **Principles**: Do not commit secrets; mask in logs; rotate periodically; restrict scope to only what is required.
+### Image Naming and Tagging (Guidance)
 
-### Pipeline behavior (high level)
+- **Registry**: `docker.io/<namespace>/<repository>`.
+- **Tags**: Use both a stable tag (e.g., latest or branch name) and a provenance tag (e.g., commit SHA) to support rollbacks and audits.
 
-- **Checkout**: Pulls the repository using configured GitHub credentials.
-- **Environment**: Creates a clean Python environment aligned with the app’s required version.
-- **Dependencies**: Installs runtime and developer testing dependencies as pinned in requirements.
-- **Testing**: Executes tests with pytest and collects coverage.
-- **Reporting**:
-  - **JUnit test results**: Published to the Jenkins build page for pass/fail visibility and trend charts.
-  - **Coverage artifacts**: Generated and archived for inspection (XML/HTML depending on configuration).
-- **Post actions**: Always archive reports; mark the build as unstable or failed when tests or thresholds do not meet standards.
+### Manual Triggers and Visibility
 
-### Triggers and usage
+- **Build Now**: The pipeline can be triggered manually from the Jenkins job page.
+- **Reports**: After completion, view JUnit test results and any archived coverage or build artifacts from the build page.
 
-- **Manual trigger**: Builds can be started from the Jenkins job via the usual manual action to validate the end-to-end flow.
-- **On change**: Jobs can be configured to run on branch updates and pull requests to provide fast feedback.
+### Operational Notes
 
-### Test database guidance
+- **Jenkinsfile location**: Ensure the job's "Script Path" points to `messaging_app/messaging_app/Jenkinsfile` due to the nested location within this repository.
+- **Build context**: The Docker build must use `messaging_app/` as the context so that `COPY` statements in `messaging_app/Dockerfile` resolve paths correctly.
+- **Secrets hygiene**: Use Jenkins Credentials; do not hardcode tokens, passwords, or registry credentials in the repository or in pipeline logs.
+- **.dockerignore**: Keep the context lean by excluding virtual environments, caches, VCS metadata, local databases, and other non-essential files.
 
-- **Default**: Prefer SQLite for unit tests to keep feedback fast and deterministic.
-- **Integration**: Introduce a service database (for example, MySQL) in CI once tests require it and are stable.
+### Troubleshooting CI (Conceptual)
 
-### Artifacts and locations
-
-- **Reports directory**: A consistent folder is used for test output so Jenkins can locate and publish results.
-- **Jenkinsfile path**: `messaging_app/Jenkinsfile`.
-
-### Interoperability with GitHub Actions
-
-- **Complementary checks**: GitHub Actions can run linting, coverage thresholds, and optional container builds alongside Jenkins.
-- **Secrets**: Use GitHub Secrets for tokens and registry credentials in workflows; never commit them to the repo.
-
-### References
-
-- Jenkins documentation: https://www.jenkins.io/doc/
-- Jenkins Pipeline: https://www.jenkins.io/doc/book/pipeline/
-- ShiningPanda plugin: https://plugins.jenkins.io/shiningpanda/
-- JUnit plugin: https://plugins.jenkins.io/junit/
-- GitHub Actions: https://docs.github.com/actions
-- pytest: https://docs.pytest.org/
-- coverage.py: https://coverage.readthedocs.io/
+- **Docker not available**: Validate the agent's Docker access if builds fail prior to image creation.
+- **Missing dev dependencies**: Ensure test tools are declared and installed; otherwise the test stage will fail before the build.
+- **Incorrect script path**: If the job cannot find the pipeline definition, verify the Script Path matches the nested Jenkinsfile.
+- **Push failures**: Confirm Docker Hub credentials are present and the target repository namespace is correct.
