@@ -1,0 +1,57 @@
+pipeline {
+    agent any
+
+    environment {
+        // Replace with your GitHub repo and credentials ID
+        REPO_URL = 'https://github.com/thecollekta/alx-backend-python.git'
+        CREDENTIALS_ID = 'github-creds'
+        VENV = '.venv'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                git credentialsId: "${CREDENTIALS_ID}", url: "${REPO_URL}", branch: 'main'
+            }
+        }
+
+        stage('Set Up Python') {
+            steps {
+                script {
+                    sh """
+                    python3 -m venv ${VENV}
+                    source ${VENV}/bin/activate
+                    pip install --upgrade pip
+                    pip install -r messaging_app/requirements.txt
+                    """
+                }
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                script {
+                    sh """
+                    source ${VENV}/bin/activate
+                    pytest --maxfail=1 --disable-warnings -q --junitxml=test-results/results.xml
+                    """
+                }
+            }
+        }
+
+        stage('Publish Test Report') {
+            steps {
+                junit 'test-results/results.xml'
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline finished.'
+        }
+        failure {
+            echo 'Build failed. Please check logs.'
+        }
+    }
+}

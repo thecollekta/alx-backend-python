@@ -1133,162 +1133,65 @@ curl -X POST http://localhost:8000/api/v1/conversations/1/messages/ \
 
 ```
 
-Follow these instructions to make the following change to my code document.
+## CI/CD: Jenkins and GitHub Actions
 
-Instruction: Add a new section for Rolling Updates after the Blue-Green Deployment Strategy section
+This project implements Continuous Integration using Jenkins, with Pipeline-as-Code stored in the repository, and is designed to interoperate with GitHub Actions for additional checks.
 
-Code Edit:
+- **Scope**: Automated test execution, code quality gates, and artifact/report publishing on each change.
+- **Source of truth**: Jenkins pipeline defined at `messaging_app/Jenkinsfile` in this repository.
 
-```
-{{ ... }}
-## Rolling Updates with Zero Downtime
+### Jenkins setup (conceptual)
 
-This project supports zero-downtime rolling updates using Kubernetes' built-in deployment strategies. The `kubectl-0x03` script automates the update process and verifies application health throughout the deployment.
+- **Runtime**: Jenkins LTS runs in a container with persistent storage for the Jenkins home directory and the web UI exposed locally.
+- **Initial configuration**: Admin unlock, suggested plugins installation, and creation of an administrator account.
+- **Plugins in use**:
+  - **Git**: Enables cloning from GitHub.
+  - **Pipeline**: Supports Jenkins Pipeline definitions from the repo.
+  - **ShiningPanda**: Manages Python toolchains and virtual environments for builds.
+  - **JUnit**: Publishes test results as build reports.
 
-### Key Features
+### Credentials and security
 
-- **Zero-downtime updates** - Maintains application availability during deployment
-- **Health monitoring** - Continuous verification of application health
-- **Automatic rollback** - On failure, the deployment automatically rolls back
-- **Progress tracking** - Real-time monitoring of the update process
+- **GitHub access**: A Personal Access Token (least privilege) is stored in Jenkins Credentials and used by the checkout step.
+- **Principles**: Do not commit secrets; mask in logs; rotate periodically; restrict scope to only what is required.
 
-### Deployment Configuration
+### Pipeline behavior (high level)
 
-The rolling update strategy is configured in `blue_deployment.yaml`:
+- **Checkout**: Pulls the repository using configured GitHub credentials.
+- **Environment**: Creates a clean Python environment aligned with the app’s required version.
+- **Dependencies**: Installs runtime and developer testing dependencies as pinned in requirements.
+- **Testing**: Executes tests with pytest and collects coverage.
+- **Reporting**:
+  - **JUnit test results**: Published to the Jenkins build page for pass/fail visibility and trend charts.
+  - **Coverage artifacts**: Generated and archived for inspection (XML/HTML depending on configuration).
+- **Post actions**: Always archive reports; mark the build as unstable or failed when tests or thresholds do not meet standards.
 
-```yaml
-spec:
-  replicas: 3
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
-  minReadySeconds: 5
-```
+### Triggers and usage
 
-- **maxSurge: 1** - Allows one extra pod during the update
-- **maxUnavailable: 0** - Ensures full capacity during updates
-- **minReadySeconds: 5** - Gives pods time to warm up before receiving traffic
+- **Manual trigger**: Builds can be started from the Jenkins job via the usual manual action to validate the end-to-end flow.
+- **On change**: Jobs can be configured to run on branch updates and pull requests to provide fast feedback.
 
-### Using the Rolling Update Script
+### Test database guidance
 
-The `kubectl-0x03` script automates the update process:
+- **Default**: Prefer SQLite for unit tests to keep feedback fast and deterministic.
+- **Integration**: Introduce a service database (for example, MySQL) in CI once tests require it and are stable.
 
-```bash
-# Make the script executable
-chmod +x kubectl-0x03
+### Artifacts and locations
 
-# Run the rolling update
-./kubectl-0x03
-```
+- **Reports directory**: A consistent folder is used for test output so Jenkins can locate and publish results.
+- **Jenkinsfile path**: `messaging_app/Jenkinsfile`.
 
-### How It Works
+### Interoperability with GitHub Actions
 
-1. **Starts Health Checks**
-   - Begins continuous health checks against the application
-   - Logs all requests for later analysis
+- **Complementary checks**: GitHub Actions can run linting, coverage thresholds, and optional container builds alongside Jenkins.
+- **Secrets**: Use GitHub Secrets for tokens and registry credentials in workflows; never commit them to the repo.
 
-2. **Applies Updates**
-   - Updates the deployment with the new image version
-   - Uses Kubernetes' rolling update strategy
-   - Monitors the update progress
+### References
 
-3. **Verifies Deployment**
-   - Checks that all pods are running the new version
-   - Verifies service endpoints are updated
-   - Confirms application health
-
-### Monitoring the Update
-
-During the update, the script provides real-time feedback:
-
-- Green checkmarks (✓) for successful health checks
-- Red X's (✗) for failed health checks
-- Progress updates on the deployment status
-
-### Verifying the Update
-
-After the update completes, verify the deployment:
-
-```bash
-# Check deployment status
-kubectl get deployments -n messaging
-
-# View pods (should show new version)
-kubectl get pods -n messaging -l app=messaging-app
-
-# Check rollout history
-kubectl rollout history deployment/messaging-app-blue -n messaging
-
-# View detailed status
-kubectl describe deployment messaging-app-blue -n messaging
-```
-
-### Rollback Process
-
-If an update fails, Kubernetes automatically rolls back to the previous version. You can also manually rollback:
-
-```bash
-# View rollout history
-kubectl rollout history deployment/messaging-app-blue -n messaging
-
-# Rollback to previous version
-kubectl rollout undo deployment/messaging-app-blue -n messaging
-
-# Rollback to specific revision
-kubectl rollout undo deployment/messaging-app-blue -n messaging --to-revision=2
-```
-
-### Best Practices
-
-1. **Test Updates in Staging**
-   - Always test updates in a staging environment first
-   - Verify compatibility with the current database schema
-
-2. **Monitor During Updates**
-   - Keep an eye on application metrics
-   - Watch for increased error rates or performance issues
-
-3. **Set Resource Limits**
-   - Ensure pods have appropriate resource requests and limits
-   - Prevents resource starvation during updates
-
-4. **Use Readiness Probes**
-   - Configure proper readiness probes
-   - Ensures traffic only reaches healthy pods
-
-### Troubleshooting
-
-1. **Update Stalls**
-
-   ```bash
-   # Check deployment status
-   kubectl describe deployment messaging-app-blue -n messaging
-   
-   # Check pod events
-   kubectl get events -n messaging --sort-by='.metadata.creationTimestamp'
-   ```
-
-2. **Health Check Failures**
-
-   ```bash
-   # Check pod logs
-   kubectl logs -n messaging -l app=messaging-app --tail=50
-   
-   # Check pod status
-   kubectl get pods -n messaging -o wide
-   ```
-
-3. **Image Pull Issues**
-
-   ```bash
-   # Check pod status
-   kubectl describe pod -n messaging -l app=messaging-app
-   
-   # Check image pull secrets
-   kubectl get secrets -n messaging
-   ```
-
-For more information on rolling updates, refer to the [Kubernetes documentation](https://kubernetes.io/docs/tutorials/kubernetes-basics/update/update-intro/).
-
+- Jenkins documentation: https://www.jenkins.io/doc/
+- Jenkins Pipeline: https://www.jenkins.io/doc/book/pipeline/
+- ShiningPanda plugin: https://plugins.jenkins.io/shiningpanda/
+- JUnit plugin: https://plugins.jenkins.io/junit/
+- GitHub Actions: https://docs.github.com/actions
+- pytest: https://docs.pytest.org/
+- coverage.py: https://coverage.readthedocs.io/
