@@ -6,13 +6,12 @@ pipeline {
         REPO_URL = 'https://github.com/thecollekta/alx-backend-python.git'
         CREDENTIALS_ID = 'github-creds'
         VENV = '.venv'
-        BRANCH = 'main'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git credentialsId: "${CREDENTIALS_ID}", url: "${REPO_URL}", branch: 'main'
+                git branch; main, credentialsId: "${CREDENTIALS_ID}", url: "${REPO_URL}"
             }
         }
 
