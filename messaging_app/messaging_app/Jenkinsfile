@@ -4,8 +4,12 @@ pipeline {
     environment {
         // Replace with your GitHub repo and credentials ID
         REPO_URL = 'https://github.com/thecollekta/alx-backend-python.git'
-        CREDENTIALS_ID = 'github-creds'
+        CREDENTIALS_ID = 'github-creds' // Jenkins GitHub credentials
         VENV = '.venv'
+        // Docker environment variables
+        DOCKER_IMAGE = 'collekta/messaging-app'  // Your Docker Hub Username
+        DOCKER_TAG = "latest-${env.BUILD_ID}"
+        DOCKER_REGISTRY_CREDENTIALS = 'dockerhub-creds' // Jenkins DockerHub credentials
     }
 
     stages {
@@ -46,9 +50,39 @@ pipeline {
         }
     }
 
+    stage('Build Docker Image') {
+            steps {
+                script {
+                    dir('messaging_app') {
+                        sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                    }
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(
+                        credentialsId: "${DOCKER_REGISTRY_CREDENTIALS}",
+                        usernameVariable: 'DOCKER_USERNAME',
+                        passwordVariable: 'DOCKER_PASSWORD'
+                    )]) {
+                        sh """
+                        echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
+                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                        """
+                    }
+                }
+            }
+        }
+    }
+
     post {
         always {
             echo 'Pipeline finished.'
+            // Clean up Docker credentials
+            sh 'docker logout'
         }
         failure {
             echo 'Build failed. Please check logs.'
