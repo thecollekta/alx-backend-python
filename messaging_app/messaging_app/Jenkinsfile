@@ -13,7 +13,7 @@ pipeline {
         DOCKER_REGISTRY_CREDENTIALS = 'dockerhub-creds' // Jenkins DockerHub credentials
 
         // Application path
-        APP_PATH = 'messaging_app/messaging_app'
+        APP_PATH = 'messaging_app'
     }
 
     stages {
@@ -33,7 +33,7 @@ pipeline {
                     echo "Messaging app directory:"
                     ls -la messaging_app/
                     echo "Application directory:"
-                    ls -la messaging_app/messaging_app/
+                    ls -la messaging_app/
                     '''
                 }
             }
@@ -132,16 +132,6 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    dir('messaging_app') {
-                        sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                    }
-                }
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                script {
                     dir("${APP_PATH}") {
                         // Create Dockerfile if it doesn't exist
                         sh '''
@@ -149,7 +139,7 @@ pipeline {
                             echo "Creating basic Dockerfile..."
                             cat > Dockerfile << 'EOF'
 # Use Python 3.10 as base image
-FROM python:3.10
+FROM python:3.10-slim
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
