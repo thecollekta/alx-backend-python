@@ -195,3 +195,12 @@ cython_debug/
 
 # GitHub
 # .github/
+
+# Secrets
+secrets/
+*.key
+*.pem
+
+# Database
+*.sqlite3
+db.sqlite3
