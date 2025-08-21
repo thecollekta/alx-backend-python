@@ -3,10 +3,6 @@
 pipeline {
     agent any
 
-    tools {
-        python 'Python3'  // This references the Python installation you configured
-    }
-
     environment {
         // GitHub configuration
         REPO_URL = 'https://github.com/thecollekta/alx-backend-python.git'
@@ -28,6 +24,10 @@ pipeline {
         DB_NAME = 'db.sqlite3'
         DJANGO_ALLOWED_HOSTS = 'localhost,127.0.0.1'
         DJANGO_SETTINGS_MODULE = 'messaging_app.settings'
+        
+        // Explicitly set Python path
+        PYTHON = '/usr/bin/python3'
+        PIP = '/usr/bin/pip3'
     }
 
     stages {
@@ -65,16 +65,15 @@ pipeline {
                     dir("${APP_DIR}") {
                         sh """
                         # Create virtual environment using system Python
-                        /usr/bin/python3 -m venv ${VENV}
-                        source ${VENV}/bin/activate
+                        ${env.PYTHON} -m venv ${VENV}
                         
-                        # Upgrade pip and install dependencies
-                        pip3 install --upgrade pip3
-                        pip3 install -r requirements.txt
+                        # Upgrade pip and install dependencies using venv's pip
+                        ${VENV}/bin/pip install --upgrade pip
+                        ${VENV}/bin/pip install -r requirements.txt
                         
                         # Verify installations
                         echo "Installed packages"
-                        pip3 list
+                        ${VENV}/bin/pip list
                         """
                     }
                 }
@@ -86,69 +85,48 @@ pipeline {
                 script {
                     dir("${APP_DIR}") {
                         sh """
-                        source ${VENV}/bin/activate
-                        
                         echo "Running Django system checks"
-                        python manage.py check --deploy || echo "System check completed with warnings"
+                        ${VENV}/bin/python manage.py check --deploy || echo "System check completed with warnings"
                         
                         echo "Checking migrations"
-                        python manage.py makemigrations --check --dry-run || echo "Migrations may be needed"
+                        ${VENV}/bin/python manage.py makemigrations --check --dry-run || echo "Migrations may be needed"
                         """
                     }
                 }
             }
         }
-
+        
         stage('Run Code Quality & Security Checks') {
             steps {
                 script {
                     dir("${APP_DIR}") {
                         sh """
-                        source ${VENV}/bin/activate
-                        
                         # Run linting
                         echo "Running Flake8 linting"
-                        pip3 install flake8 || echo "Flake8 installation failed"
-                        flake8 . --count --max-line-length=88 --extend-ignore=E203,W503 --show-source --statistics || echo "Flake8 check completed"
+                        ${VENV}/bin/pip install flake8 || echo "Flake8 installation failed"
+                        ${VENV}/bin/flake8 . --count --max-line-length=88 --extend-ignore=E203,W503 --show-source --statistics || echo "Flake8 check completed"
                         """
                     }
                 }
             }
         }
-
+        
         stage('Run Tests') {
             steps {
                 script {
                     dir("${APP_DIR}") {
                         sh """
-                        source ${VENV}/bin/activate
-                        
                         # Create test results directory
                         mkdir -p test-results
                         
                         # Run tests with coverage
-                        python -m pytest \
+                        ${VENV}/bin/python -m pytest \
                             --junitxml=test-results/results.xml \
                             --cov=. \
                             --cov-report=xml:coverage.xml \
                             --cov-report=html:htmlcov/ \
                             --cov-report=term-missing || echo "Tests completed with some failures"
                         """
-                    }
-                }
-            }
-        }
-
-        stage('Publish Results') {
-            steps {
-                script {
-                    // Publish test results
-                    junit "${APP_DIR}/test-results/results.xml"
-                    
-                    // Archive reports
-                    dir("${APP_DIR}") {
-                        archiveArtifacts artifacts: 'htmlcov/**', allowEmptyArchive: true
-                        archiveArtifacts artifacts: 'coverage.xml', allowEmptyArchive: true
                     }
                 }
             }
