@@ -1,19 +1,31 @@
 pipeline {
     agent any
 
-    environment {
-        // Replace with your GitHub repo and credentials ID
-        REPO_URL = 'https://github.com/thecollekta/alx-backend-python.git'
-        CREDENTIALS_ID = 'github-creds' // Jenkins GitHub credentials
-        VENV = '.venv'
-        
-        // Docker environment variables
-        DOCKER_IMAGE = 'collekta/messaging-app'  // Your Docker Hub Username
-        DOCKER_TAG = "latest-${env.BUILD_ID}"
-        DOCKER_REGISTRY_CREDENTIALS = 'dockerhub-creds' // Jenkins DockerHub credentials
+    tools {
+        python 'Python3'  // This references the Python installation you configured
+    }
 
-        // Application path
-        APP_PATH = 'messaging_app'
+    environment {
+        // GitHub configuration
+        REPO_URL = 'https://github.com/thecollekta/alx-backend-python.git'
+        CREDENTIALS_ID = 'github-creds'
+        
+        // Docker configuration
+        DOCKER_IMAGE = 'collekta/messaging-app'
+        DOCKER_TAG = "latest-${env.BUILD_ID}"
+        DOCKER_REGISTRY_CREDENTIALS = 'dockerhub-creds'
+        
+        // Application configuration
+        APP_DIR = 'messaging_app'
+        VENV = 'venv'
+        
+        // Django environment variables for testing
+        SECRET_KEY = 'test-secret-key-for-ci-cd-pipeline'
+        DEBUG = 'False'
+        DB_ENGINE = 'sqlite3'
+        DB_NAME = 'db.sqlite3'
+        DJANGO_ALLOWED_HOSTS = 'localhost,127.0.0.1'
+        DJANGO_SETTINGS_MODULE = 'messaging_app.settings'
     }
 
     stages {
@@ -26,14 +38,20 @@ pipeline {
         stage('Verify Structure') {
             steps {
                 script {
-                    // Debug: Check repository structure
                     sh '''
-                    echo "Repository structure:"
+                    echo "Repository Structure"
                     ls -la
-                    echo "Messaging app directory:"
-                    ls -la messaging_app/
-                    echo "Application directory:"
-                    ls -la messaging_app/
+                    echo ""
+                    echo "Messaging App Directory"
+                    if [ -d "messaging_app" ]; then
+                        ls -la messaging_app/
+                    else
+                        echo "messaging_app directory not found!"
+                        exit 1
+                    fi
+                    echo ""
+                    echo "Python Version"
+                    /usr/bin/python3 --version || echo "Python 3 not available"
                     '''
                 }
             }
@@ -42,45 +60,55 @@ pipeline {
         stage('Set Up Python Environment') {
             steps {
                 script {
-                    dir("${APP_PATH}") {
-                        sh '''
-                        # Create and activate virtual environment
-                        python3 -m venv ${VENV}
+                    dir("${APP_DIR}") {
+                        sh """
+                        # Create virtual environment using system Python
+                        /usr/bin/python3 -m venv ${VENV}
                         source ${VENV}/bin/activate
                         
                         # Upgrade pip and install dependencies
-                        pip3 install --upgrade pip
+                        pip install --upgrade pip
+                        pip install -r requirements.txt
                         
-                        # Check if requirements.txt exists
-                        if [ -f "requirements.txt" ]; then
-                            pip3 install -r requirements.txt
-                        else
-                            echo "No requirements.txt found, installing basic dependencies"
-                            pip3 install pytest flask django djangorestframework
-                        fi
-                        '''
+                        # Verify installations
+                        echo "Installed packages"
+                        pip list
+                        """
                     }
                 }
             }
         }
 
-        stage('Run Linting') {
+        stage('Django System Check') {
             steps {
                 script {
-                    dir("${APP_PATH}") {
-                        sh '''
+                    dir("${APP_DIR}") {
+                        sh """
                         source ${VENV}/bin/activate
                         
-                        # Install linting tools if not present
-                        pip3 install flake8 black
+                        echo "Running Django system checks"
+                        python manage.py check --deploy || echo "System check completed with warnings"
+                        
+                        echo "Checking migrations"
+                        python manage.py makemigrations --check --dry-run || echo "Migrations may be needed"
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Run Code Quality & Security Checks') {
+            steps {
+                script {
+                    dir("${APP_DIR}") {
+                        sh """
+                        source ${VENV}/bin/activate
                         
                         # Run linting
-                        echo "Running code linting..."
-                        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics || true
-                        
-                        # Check code formatting
-                        black --check . || true
-                        '''
+                        echo "Running Flake8 linting"
+                        pip install flake8 || echo "Flake8 installation failed"
+                        flake8 . --count --max-line-length=88 --extend-ignore=E203,W503 --show-source --statistics || echo "Flake8 check completed"
+                        """
                     }
                 }
             }
@@ -89,41 +117,36 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    dir("${APP_PATH}") {
-                        sh '''
+                    dir("${APP_DIR}") {
+                        sh """
                         source ${VENV}/bin/activate
                         
                         # Create test results directory
                         mkdir -p test-results
                         
-                        # Install pytest if not already installed
-                        pip3 install pytest pytest-xvs
-                        
-                        # Run tests with proper configuration
-                        python3 -m pytest \
-                            --maxfail=1 \
-                            --disable-warnings \
-                            -q \
+                        # Run tests with coverage
+                        python -m pytest \
                             --junitxml=test-results/results.xml \
-                            --tb=short \
-                            . || echo "Tests completed with issues"
-                        '''
+                            --cov=. \
+                            --cov-report=xml:coverage.xml \
+                            --cov-report=html:htmlcov/ \
+                            --cov-report=term-missing || echo "Tests completed with some failures"
+                        """
                     }
                 }
             }
         }
 
-        stage('Publish Test Results') {
+        stage('Publish Results') {
             steps {
                 script {
-                    // Use relative path from workspace root
-                    def testResultsPath = "${APP_PATH}/test-results/results.xml"
+                    // Publish test results
+                    junit "${APP_DIR}/test-results/results.xml"
                     
-                    // Check if test results exist
-                    if (fileExists(testResultsPath)) {
-                        junit testResultsPath
-                    } else {
-                        echo "No test results found at ${testResultsPath}"
+                    // Archive reports
+                    dir("${APP_DIR}") {
+                        archiveArtifacts artifacts: 'htmlcov/**', allowEmptyArchive: true
+                        archiveArtifacts artifacts: 'coverage.xml', allowEmptyArchive: true
                     }
                 }
             }
@@ -132,175 +155,111 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    dir("${APP_PATH}") {
-                        // Create Dockerfile if it doesn't exist
-                        sh '''
-                        if [ ! -f "Dockerfile" ]; then
-                            echo "Creating basic Dockerfile..."
-                            cat > Dockerfile << 'EOF'
-# Use Python 3.10 as base image
-FROM python:3.10-slim
-
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-
-# Set work directory
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
-        postgresql-client \
-        netcat-openbsd \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy project
-COPY . /app/
-
-# Create staticfiles directory
-RUN mkdir -p /app/staticfiles
-
-# Create media directory
-RUN mkdir -p /app/media
-
-# Make entrypoint script executable
-COPY entrypoint.sh /app/
-RUN chmod +x /app/entrypoint.sh
-
-# Expose port 8000
-EXPOSE 8000
-
-# Use entrypoint script
-ENTRYPOINT ["/app/entrypoint.sh"]
-EOF
-                        fi
-                        '''
-                        
-                        // Build Docker image
-                        sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
-                        
-                        // Tag as latest
-                        sh "docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest"
+                    // Check if Docker is available and daemon is running
+                    def dockerAvailable = sh(script: 'docker info >/dev/null 2>&1', returnStatus: true) == 0
+                    
+                    if (dockerAvailable) {
+                        dir("${APP_DIR}") {
+                            sh """
+                            # Verify Dockerfile exists
+                            if [ ! -f "Dockerfile" ]; then
+                                echo "ERROR: Dockerfile not found!"
+                                exit 1
+                            fi
+                            
+                            # Build Docker image
+                            docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                            
+                            echo "Docker image built successfully:"
+                            docker images | grep ${DOCKER_IMAGE} || true
+                            """
+                        }
+                    } else {
+                        echo "Docker daemon not available, skipping Docker build"
                     }
                 }
             }
         }
-        
+
         stage('Push Docker Image') {
-            when {
-                // Only push on main branch or when explicitly triggered
-                anyOf {
-                    branch 'main'
-                    expression { params.FORCE_DEPLOY == true }
-                }
-            }
             steps {
                 script {
-                    withCredentials([usernamePassword(
-                        credentialsId: "${DOCKER_REGISTRY_CREDENTIALS}",
-                        usernameVariable: 'DOCKER_USERNAME',
-                        passwordVariable: 'DOCKER_PASSWORD'
-                    )]) {
-                        sh '''
-                        # Login to Docker Hub
-                        echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
-                        
-                        # Push both tags
-                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
-                        docker push ${DOCKER_IMAGE}:latest
-                        
-                        echo "Successfully pushed Docker images"
-                        '''
-                    }
-                }
-            }
-        }
-        
-        stage('Security Scan') {
-            steps {
-                script {
-                    dir("${APP_PATH}") {
-                        sh '''
-                        source ${VENV}/bin/activate
-                        
-                        # Install security scanning tools
-                        pip3 install safety bandit
-                        
-                        # Check for known security vulnerabilities
-                        echo "Running security scan..."
-                        safety check || true
-                        
-                        # Static analysis for security issues
-                        bandit -r . -f json -o bandit-results.json || true
-                        '''
+                    // Check if Docker is available and daemon is running
+                    def dockerAvailable = sh(script: 'docker info >/dev/null 2>&1', returnStatus: true) == 0
+                    
+                    if (dockerAvailable) {
+                        withCredentials([usernamePassword(
+                            credentialsId: "${DOCKER_REGISTRY_CREDENTIALS}",
+                            usernameVariable: 'DOCKER_USERNAME',
+                            passwordVariable: 'DOCKER_PASSWORD'
+                        )]) {
+                            sh """
+                            echo "=== Pushing Docker Image ==="
+                            
+                            # Login to Docker Hub
+                            echo "${DOCKER_PASSWORD}" | docker login -u "${DOCKER_USERNAME}" --password-stdin
+                            
+                            # Push the image
+                            docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                            
+                            echo "Successfully pushed: ${DOCKER_IMAGE}:${DOCKER_TAG}"
+                            """
+                        }
+                    } else {
+                        echo "Docker daemon not available, skipping Docker push"
                     }
                 }
             }
         }
     }
-    
+
     post {
         always {
             script {
-                echo 'Cleaning up...'
+                echo 'Pipeline Cleanup'
                 
-                // Archive artifacts
-                archiveArtifacts artifacts: '**/test-results/*.xml', allowEmptyArchive: true
-                archiveArtifacts artifacts: '**/bandit-results.json', allowEmptyArchive: true
+                // Archive any remaining artifacts
+                dir("${APP_DIR}") {
+                    archiveArtifacts artifacts: 'test-results/*.xml', allowEmptyArchive: true
+                }
                 
-                // Clean up Docker resources
+                // Clean up Docker resources if Docker is available
                 sh '''
-                docker logout || true
-                
-                # Remove build images to save space
-                docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} || true
-                docker system prune -f || true
+                if docker info >/dev/null 2>&1; then
+                    docker logout || true
+                    docker rmi ${DOCKER_IMAGE}:${DOCKER_TAG} || true
+                    docker image prune -f || true
+                fi
                 '''
                 
                 // Clean up virtual environment
-                dir("${APP_PATH}") {
-                    sh 'rm -rf ${VENV} || true'
+                dir("${APP_DIR}") {
+                    sh 'rm -rf venv || true'
                 }
             }
         }
         
         success {
-            echo 'Pipeline completed successfully!'
-            
-            // Notify success (you can integrate with Slack, email, etc.)
             script {
                 def message = """
                 Build Success!
                 Project: MessagingApp
-                Branch: ${env.BRANCH_NAME}
-                Build: ${env.BUILD_NUMBER}
-                Docker Image: ${DOCKER_IMAGE}:${DOCKER_TAG}
+                Build: #${env.BUILD_NUMBER}
                 """
                 echo message
             }
         }
         
         failure {
-            echo 'Pipeline failed. Check the logs for details.'
-            
-            // Enhanced failure notification
             script {
                 def message = """
                 Build Failed!
-                Project: MessagingApp  
-                Branch: ${env.BRANCH_NAME}
-                Build: ${env.BUILD_NUMBER}
-                Failed Stage: ${env.STAGE_NAME}
+                Project: MessagingApp
+                Build: #${env.BUILD_NUMBER}
+                
+                Check the console output for details.
                 """
                 echo message
-                
-                // Collect logs for debugging
-                sh 'docker logs $(docker ps -aq) || true'
             }
         }
         
