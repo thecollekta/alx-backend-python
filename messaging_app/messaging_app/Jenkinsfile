@@ -67,12 +67,12 @@ pipeline {
                         source ${VENV}/bin/activate
                         
                         # Upgrade pip and install dependencies
-                        pip install --upgrade pip
-                        pip install -r requirements.txt
+                        pip3 install --upgrade pip3
+                        pip3 install -r requirements.txt
                         
                         # Verify installations
                         echo "Installed packages"
-                        pip list
+                        pip3 list
                         """
                     }
                 }
@@ -106,7 +106,7 @@ pipeline {
                         
                         # Run linting
                         echo "Running Flake8 linting"
-                        pip install flake8 || echo "Flake8 installation failed"
+                        pip3 install flake8 || echo "Flake8 installation failed"
                         flake8 . --count --max-line-length=88 --extend-ignore=E203,W503 --show-source --statistics || echo "Flake8 check completed"
                         """
                     }
